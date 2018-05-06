@@ -4,7 +4,7 @@ from os import sep as SEP
 # Folders
 PROJECT_PATH = os.path.normpath(os.getcwd() + os.sep + os.pardir)
 
-SCRIPTS_FOLDER = "scripts"
+SCRIPTS_FOLDER = "utils"
 SCRIPTS_PATH = PROJECT_PATH + SEP + SCRIPTS_FOLDER
 
 DATA_FOLDER = "data"
@@ -24,10 +24,15 @@ TOKENIZED_TRAIN_PATH = DATA_PATH + SEP + TOKENIZED_TRAIN
 EMBEDDED_TRAIN = "emb_train.json"
 EMBEDDED_TRAIN_PATH = DATA_PATH + SEP + EMBEDDED_TRAIN
 
+INDEX2WORD = "index2word.npy"
+INDEX2WORD_PATH = DATA_PATH + SEP + INDEX2WORD
 
 # Embeddings
-BIN_EMBEDDING = "wiki.simple.bin"
-BIN_EMBEDDING_PATH = DATA_PATH + SEP + BIN_EMBEDDING
+ALL_EMBEDDING = "wiki.simple.bin"
+ALL_EMBEDDING_PATH = DATA_PATH + SEP + ALL_EMBEDDING
+
+TRAIN_EMBEDDING = "train_embedding.npy"
+TRAIN_EMBEDDING_PATH = DATA_PATH + SEP + TRAIN_EMBEDDING
 
 '''
 RAW_EMBEDDING = "wiki-news-300d-1M-subword.vec"

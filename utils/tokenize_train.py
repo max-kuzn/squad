@@ -1,9 +1,8 @@
+from constants import *
+from util import tokenize
+
 import json
 from tqdm import tqdm
-import subprocess
-from nltk.tokenize import RegexpTokenizer
-from constants import RAW_TRAIN_PATH, TOKENIZED_TRAIN_PATH
-import constants
 
 all_qas = 0
 good_qas = 0
@@ -20,9 +19,30 @@ def tokenize(text):
 #tokenize
 '''
 
+'''
+Generate json file
+
+{
+  "paragraphs": [
+    {
+      "context": ["bla", "bla", ..., "."],
+      "qas": [
+        {
+          "question": ["What", "bla", ..., "?"],
+          "answer_begin": 10,
+          "answer_end": 13
+        }
+      ]
+    },
+    ...,
+    {}
+  ]
+}
+'''
+
 def tokenize(string):
     tokenizer = subprocess.Popen(
-            [constants.TOKENIZER_PATH],
+            [TOKENIZER_PATH],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE
     )
@@ -51,13 +71,12 @@ def find_subtext(text, sub):
 
 def tokenize_qa(qa, context):
     tokenized_qa = list()
-    for a in qa["answers"]:
-        question_answer = dict()
-        question_answer["question"] = tokenize(qa["question"])
-        question_answer["answer_begin"], question_answer["answer_end"] = \
-            find_subtext(context, tokenize(a["text"]))
-        tokenized_qa.append(question_answer)
-    return tokenized_qa
+    a = qa["answers"][0]
+    question_answer = dict()
+    question_answer["question"] = tokenize(qa["question"])
+    question_answer["answer_begin"], question_answer["answer_end"] = \
+        find_subtext(context, tokenize(a["text"]))
+    return question_answer
 #tokenize_qa
 
 def tokenize_paragraph(par):
