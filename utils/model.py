@@ -1,5 +1,5 @@
 from constants import *
-from utils import *
+from util import *
 
 from tqdm import tqdm
 import numpy as np
@@ -15,7 +15,7 @@ def rnn_cell():
 # rnn_cell
 
 def bidirect_cell(inputs, inputs_len, initial_state=None):
-    outputs, states = tf.nn.bidirectional_dynamic_rnn(
+    out = tf.nn.bidirectional_dynamic_rnn(
             cell_fw=rnn_cell(),
             cell_bw=rnn_cell(),
             inputs=inputs,
@@ -24,22 +24,23 @@ def bidirect_cell(inputs, inputs_len, initial_state=None):
             initial_state_bw=initial_state,
             dtype=tf.float32
         )
+    outputs, states = out
     return tf.concat(outputs, 2), tf.concat(states, 1)
 # bidirect_cell
 
 class Model:
     def __init__(
             self,
-            mode="train" # "train", "test" or "both"
-            logs=True
-            batch_size=BATCH_SIZE
+            mode="train", # "train", "test" or "both"
+            logs=True,
+            batch_size=BATCH_SIZE,
             epochs=EPOCHS,
             embedding_size=EMBEDDING_SIZE
     ):
         self.__setup_constants(
                 bs=batch_size,
                 e=epochs,
-                ez=embedding_size
+                es=embedding_size
         )
         self.__logs = logs
         self.__mode = mode
@@ -76,23 +77,24 @@ class Model:
                 context_outputs, context_state = self.__setup_context(
                         question_outputs, question_state
                 )
-            self.loss = self.__get_loss(question_outputs, question_state,
-                    context_outputs, contex_state
+            self.loss = self.__get_loss(batch_size,
+                    question_outputs, question_state,
+                    context_outputs, context_state
             )
             optimizer = tf.train.AdamOptimizer(0.0001)
-            gradients, variables = zip(*optimizer.compute_gradients(loss))
+            gradients, variables = zip(*optimizer.compute_gradients(self.loss))
             gradients, _ = tf.clip_by_global_norm(gradients, 5000)
             self.train_step = optimizer.apply_gradients(zip(gradients, variables))
     # __setup_model
 
-    def __setup_inputs():
+    def __setup_inputs(self):
         self.context = tf.placeholder(
-            tf.int32,
+            tf.float32,
             name="context",
             shape=(None, None, self.__EMBEDDING_SIZE)
         )
         self.question = tf.placeholder(
-            tf.int32,
+            tf.float32,
             name="question",
             shape=(None, None, self.__EMBEDDING_SIZE)
         )
@@ -106,7 +108,7 @@ class Model:
             name="question_lenght",
             shape=(None)
         )
-        self.answer_begin = ft.placeholder(
+        self.answer_begin = tf.placeholder(
             tf.int32,
             name="answer_begin",
             shape=(None)
@@ -118,28 +120,30 @@ class Model:
         )
     # __setup_inputs
 
-    def __setup_question():
-        return bidirect_rnn(self.question, self.question_len)
+    def __setup_question(self):
+        return bidirect_cell(self.question, self.question_len)
     # __setup_question
 
-    def __setup_context(question_outputs, question_state):
-        return bidirect_rnn(self.context, self.context_len,
-            initial_state=question_state
+    def __setup_context(self, question_outputs, question_state):
+        return bidirect_cell(self.context, self.context_len,
+            initial_state=None #question_state
         )
     # __setup_context()
 
-    def __get_loss(
+    def __get_loss(self, batch_size,
             question_outputs, question_state,
-            context_outputs context_state
+            context_outputs, context_state
     ):
-        prob = tf.dense(
+        prob = tf.layers.dense(
                 inputs=context_outputs,
                 units=RNN_HIDDEN_SIZE,
                 use_bias=True
         )
+        print(question_state)
+        # TODO
         prob = tf.matmul(prob,
-                tf.reshape(question_state, (1, None)))
-        return tf.reduse_mean(
+                tf.reshape(question_state[0], (batch_size, 128, 1)))
+        return tf.reduce_mean(
             tf.nn.sparse_softmax_cross_entropy_with_logits(
                 labels=self.answer_begin,
                 logits=prob
@@ -150,13 +154,14 @@ class Model:
     def init_variables(self, session):
         if self.__logs:
             print("Start initialize variables...")
-        session.run(self.__init)
+        session.run(tf.global_variables_initializer())
         if self.__logs:
             print("Done.")
     # init_variables
 
     def train_model(self, session, train, epochs=EPOCHS):
         avg_loss = 0
+        #TODO
         for i in range(EPOCHS * 1000):
             batch = get_batch(train)
             context, question = batch[0]
@@ -164,26 +169,30 @@ class Model:
             answer_begin, answer_end = batch[2]
             loss, _ = sess.run([self.loss, self.train_step],
                     {
-                        self.context = context,
-                        self.question = quiestion,
-                        self.context_len = context_len,
-                        self.question_len = question_len,
-                        self.answer_begin = answer_begin,
-                        self.answer_end = answer_end
+                        self.context: context,
+                        self.question: quiestion,
+                        self.context_len: context_len,
+                        self.question_len: question_len,
+                        self.answer_begin: answer_begin,
+                        self.answer_end: answer_end
                     }
             )
             avg_loss += loss
+            #TODO
             if i % 1000 == 0:
                 print(avg_loss, "-", loss)
                 avg_loss = 0
     # train_model
 
     def save_model(self, session, path=MODEL_PATH):
+        #TODO
         return
     # save_movel
 
     def load_model(self, session, path=MODEL_PATH):
+        #TODO
         return
     # load_model
 
 # Model
+
