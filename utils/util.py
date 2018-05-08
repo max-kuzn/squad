@@ -18,7 +18,7 @@ def tokenize(string):
 
 class Embedding:
     def __init__(
-            self, 
+            self,
             mode="train", # Can be "train", "test", "both"
             path_to_train=TRAIN_EMBEDDING_PATH,
             path_to_train_index2word=INDEX2WORD_PATH,
@@ -50,7 +50,7 @@ class Embedding:
             w2i[i2w[i]] = i
         self.__train_index2word = i2w
         self.__train_word2index = w2i
-    
+
     def __load_all_embeddings__(self, path=ALL_EMBEDDING_PATH):
         self.__all_embeddings = fastText.load_model(path)
 

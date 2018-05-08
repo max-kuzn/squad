@@ -70,9 +70,48 @@ class Model:
         self.graph = tf.Graph()
         with self.graph.as_default():
             with tf.variable_scope("input"):
-                context = tf.placeholder(dtype=tf.int32,
+                self.__setup_inputs()
+            embedding = tf.
+            with tf.variable_scope("question"):
+                q_outs = self.__setup_question()
+                question_state = q_outs[#TODO]
+                question_
+            with tf.va
         # TODO
     # __setup_model
+
+    def __setup_inputs():
+        self.context = tf.placeholder(
+            tf.int32,
+            name="context",
+            shape=(None, None)
+        )
+        self.question = tf.placeholder(
+            tf.int32,
+            name="question",
+            shape=(None, None)
+        )
+        self.context_len = tf.placeholder(
+            tf.int32,
+            name="context_lenght",
+            shape=(None)
+        )
+        self.question_len = tf.placeholder(
+            tf.int32,
+            name="question_lenght",
+            shape=(None)
+        )
+        self.answer_begin = ft.placeholder(
+            tf.int32,
+            name="answer_begin",
+            shape=(None)
+        )
+        self.answer_end = tf.placeholder(
+            tf.int32,
+            name="answer_end",
+            shape=(None)
+        )
+    # __setup_inputs
 
     def init_variables(self, session):
         if self.__logs:
