@@ -24,11 +24,7 @@ def bidirect_cell(inputs, inputs_len, initial_state=None):
             initial_state_bw=initial_state,
             dtype=tf.float32
         )
-    output_fw, output_bw = outputs
-    state_fw, state_bw = states
-    output = tf.concat([output_fw, output_bw], axis=-1)
-    state = tf.concat([state_fw, state_bw], axis=-1)
-    return output, state
+    return tf.concat(outputs, 2), tf.concat(states, 1)
 # bidirect_cell
 
 class Model:
@@ -71,12 +67,18 @@ class Model:
         with self.graph.as_default():
             with tf.variable_scope("input"):
                 self.__setup_inputs()
-            embedding = tf.
+            batch_size = tf.shape(self.question)[0]
+            question_size = tf.shape(self.question)[1]
+            context_size = tf.shape(self.context)[1]
             with tf.variable_scope("question"):
-                q_outs = self.__setup_question()
-                question_state = q_outs[#TODO]
-                question_
-            with tf.va
+                question_outputs, question_state = self.__setup_question()
+            with tf.variable_scope("context"):
+                context_outputs, context_state = self.__setup_context(
+                        question_outputs, question_state
+                )
+            loss = self.__get_loss(question_outputs, question_state,
+                    context_outputs, contex_state
+            )
         # TODO
     # __setup_model
 
@@ -84,12 +86,12 @@ class Model:
         self.context = tf.placeholder(
             tf.int32,
             name="context",
-            shape=(None, None)
+            shape=(None, None, self.__EMBEDDING_SIZE)
         )
         self.question = tf.placeholder(
             tf.int32,
             name="question",
-            shape=(None, None)
+            shape=(None, None, self.__EMBEDDING_SIZE)
         )
         self.context_len = tf.placeholder(
             tf.int32,
@@ -113,6 +115,32 @@ class Model:
         )
     # __setup_inputs
 
+    def __setup_question():
+        return bidirect_rnn(self.question, self.question_len)
+    # __setup_question
+
+    def __setup_context(question_outputs, question_state):
+        return bidirect_rnn(self.context, self.context_len,
+            initial_state=question_state
+            )
+    # __setup_context()
+
+    def __get_loss(
+            question_outputs, question_state,
+            context_outputs context_state
+    ):
+        prob = tf.dense(
+                inputs=context_outputs,
+                units=RNN_HIDDEN_SIZE,
+                use_bias=True
+        )
+        for i in range(batch_size):
+            probi = tf.matmul(prob[0],
+                        tf.reshape(question_state, (1, None)))
+            
+        
+    # __get_loss
+
     def init_variables(self, session):
         if self.__logs:
             print("Start initialize variables...")
@@ -125,9 +153,11 @@ class Model:
     # train_model
 
     def save_model(self, session, path=MODEL_PATH):
+        return
     # save_movel
 
     def load_model(self, session, path=MODEL_PATH):
+        return
     # load_model
 
 # Model
