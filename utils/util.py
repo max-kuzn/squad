@@ -15,6 +15,7 @@ def tokenize(string):
              )[0].decode("utf-8").split()
     low_tokens = [t.lower() for t in tokens]
     return low_tokens
+# tokenize
 
 class Embedding:
     def __init__(
@@ -31,14 +32,15 @@ class Embedding:
         self.__train_word2index = None
         self.__all_embeddings = None   # fastText model
         if mode == "train" or mode == "both":
-            self.__load_train_embeddings__(
+            self.__load_train_embeddings(
                     path_to_emb=path_to_train,
                     path_to_i2w=path_to_train_index2word
             )
         if mode == "test" or mode == "both":
-            self.__load_all_embeddings__(path=path_to_bin)
+            self.__load_all_embeddings(path=path_to_bin)
+    # __init__
 
-    def __load_train_embeddings__(
+    def __load_train_embeddings(
             self,
             path_to_emb=TRAIN_EMBEDDING_PATH,
             path_to_i2w=INDEX2WORD_PATH
@@ -50,9 +52,11 @@ class Embedding:
             w2i[i2w[i]] = i
         self.__train_index2word = i2w
         self.__train_word2index = w2i
+    # __load_train_embeddings
 
-    def __load_all_embeddings__(self, path=ALL_EMBEDDING_PATH):
+    def __load_all_embeddings(self, path=ALL_EMBEDDING_PATH):
         self.__all_embeddings = fastText.load_model(path)
+    # __load_all_embeddings
 
     def get_known(self, key):
         if self.__mode == "test":
@@ -73,4 +77,5 @@ class Embedding:
         else:
             print(type(key))
             raise
+    # get_known
 
