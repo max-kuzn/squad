@@ -76,10 +76,13 @@ class Model:
                 context_outputs, context_state = self.__setup_context(
                         question_outputs, question_state
                 )
-            loss = self.__get_loss(question_outputs, question_state,
+            self.loss = self.__get_loss(question_outputs, question_state,
                     context_outputs, contex_state
             )
-        # TODO
+            optimizer = tf.train.AdamOptimizer(0.0001)
+            gradients, variables = zip(*optimizer.compute_gradients(loss))
+            gradients, _ = tf.clip_by_global_norm(gradients, 5000)
+            self.train_step = optimizer.apply_gradients(zip(gradients, variables))
     # __setup_model
 
     def __setup_inputs():
@@ -122,7 +125,7 @@ class Model:
     def __setup_context(question_outputs, question_state):
         return bidirect_rnn(self.context, self.context_len,
             initial_state=question_state
-            )
+        )
     # __setup_context()
 
     def __get_loss(
@@ -134,11 +137,14 @@ class Model:
                 units=RNN_HIDDEN_SIZE,
                 use_bias=True
         )
-        for i in range(batch_size):
-            probi = tf.matmul(prob[0],
-                        tf.reshape(question_state, (1, None)))
-            
-        
+        prob = tf.matmul(prob,
+                tf.reshape(question_state, (1, None)))
+        return tf.reduse_mean(
+            tf.nn.sparse_softmax_cross_entropy_with_logits(
+                labels=self.answer_begin,
+                logits=prob
+            )
+        )
     # __get_loss
 
     def init_variables(self, session):
@@ -150,6 +156,26 @@ class Model:
     # init_variables
 
     def train_model(self, session, train, epochs=EPOCHS):
+        avg_loss = 0
+        for i in range(EPOCHS * 1000):
+            batch = get_batch(train)
+            context, question = batch[0]
+            context_len, question_len = batch[1]
+            answer_begin, answer_end = batch[2]
+            loss, _ = sess.run([self.loss, self.train_step],
+                    {
+                        self.context = context,
+                        self.question = quiestion,
+                        self.context_len = context_len,
+                        self.question_len = question_len,
+                        self.answer_begin = answer_begin,
+                        self.answer_end = answer_end
+                    }
+            )
+            avg_loss += loss
+            if i % 1000 == 0:
+                print(avg_loss, "-", loss)
+                avg_loss = 0
     # train_model
 
     def save_model(self, session, path=MODEL_PATH):
