@@ -1,5 +1,6 @@
 from constants import *
 
+import json
 import numpy as np
 import subprocess
 import fastText
@@ -78,4 +79,39 @@ class Embedding:
             print(type(key))
             raise
     # get_known
+# Embedding
+
+# train data in format:
+# train = (context_data, question_data, answer_data)
+# Where
+# context_data  = (context,      context_len)
+# question_data = (quiestion,    quiestion_len)
+# answer        = (answer_begin, answer_end)
+def load_train(path=COMFORT_TRAIN_PATH):
+    data = np.load(path)
+    context = data['context']
+    context_len = data['context_len']
+    context_data = (context, context_len)
+    question = data['question']
+    question_len = data['question_len']
+    question_data = (question, quiestion_len)
+    answer_begin = data['answer_begin']
+    answer_end = data['answer_end']
+    answer_data = (answer_begin, answer_end)
+    train = (context_data, question_data, answer_data)
+    return train
+# load_train
+
+def get_batch(train, batch_size, embedding):
+    N = train[0][0].shape[0]
+    indexes = np.random.choice(N, batch_size, replace=False)
+# get_batch
+
+def main():
+    train = load_train()
+    get_batch(train, 0, 0)
+# main
+
+if __name__ == "__main__":
+    main()
 
