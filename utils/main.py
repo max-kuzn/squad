@@ -5,9 +5,15 @@ from model import *
 import tensorflow as tf
 
 def main():
+    print("Loading train data...")
+    train = load_train()
+    print("Done.\n")
     m = Model()
-    sess = tf.Session()
+    sess = tf.Session(graph=m.graph)
     m.init_variables(sess)
+    print("\n\n")
+    print("Start train")
+    m.train_model(sess, train, 32, 1)
 
 
 if __name__ == "__main__":

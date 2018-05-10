@@ -94,24 +94,31 @@ def load_train(path=COMFORT_TRAIN_PATH):
     context_data = (context, context_len)
     question = data['question']
     question_len = data['question_len']
-    question_data = (question, quiestion_len)
+    question_data = (question, question_len)
     answer_begin = data['answer_begin']
     answer_end = data['answer_end']
     answer_data = (answer_begin, answer_end)
     train = (context_data, question_data, answer_data)
     return train
+    '''
+    return ((data['context'], data['context_len']),
+            (data['question'], data['question_len']),
+            (data['answer_begin'], data['answer_end'])
+           )
+    '''
 # load_train
 
 def get_batch(train, batch_size, embedding):
     N = train[0][0].shape[0]
     indexes = np.random.choice(N, batch_size, replace=False)
+    context = embedding.get_known(train[0][0][indexes])
+    context_len = train[0][1][indexes]
+    question = embedding.get_known(train[1][0][indexes])
+    question_len = train[1][1][indexes]
+    answer_begin = train[2][0][indexes]
+    answer_end = train[2][1][indexes]
+    return ((context, context_len),
+            (question, question_len),
+            (answer_begin, answer_end)
+           )
 # get_batch
-
-def main():
-    train = load_train()
-    get_batch(train, 0, 0)
-# main
-
-if __name__ == "__main__":
-    main()
-
