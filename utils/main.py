@@ -13,7 +13,7 @@ def main():
     m.init_variables(sess)
     print("\n\n")
     print("Start train")
-    m.train_model(sess, train, 200, 1)
+    m.train_model(sess, train, 200, 10)
 
 
 if __name__ == "__main__":

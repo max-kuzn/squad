@@ -238,14 +238,10 @@ class Model:
             context, context_len = batch[0]
             question, question_len = batch[1]
             true_answer_begin, true_answer_end = batch[2]
-            loss, _, answer_begin, answer_end, summary = \
-                session.run(
+            summary, _ = session.run(
                     [
-                        self.loss,
-                        self.train_step,
-                        self.answer_begin,
-                        self.answer_end,
-                        self.summary
+                        self.summary,
+                        self.train_step
                     ],
                     {
                         self.context: context,
