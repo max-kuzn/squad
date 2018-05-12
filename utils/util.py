@@ -89,23 +89,11 @@ class Embedding:
 # answer        = (answer_begin, answer_end)
 def load_train(path=COMFORT_TRAIN_PATH):
     data = np.load(path)
-    context = data['context']
-    context_len = data['context_len']
-    context_data = (context, context_len)
-    question = data['question']
-    question_len = data['question_len']
-    question_data = (question, question_len)
-    answer_begin = data['answer_begin']
-    answer_end = data['answer_end']
-    answer_data = (answer_begin, answer_end)
-    train = (context_data, question_data, answer_data)
-    return train
-    '''
-    return ((data['context'], data['context_len']),
+    return (
+            (data['context'], data['context_len']),
             (data['question'], data['question_len']),
             (data['answer_begin'], data['answer_end'])
            )
-    '''
 # load_train
 
 def get_batch(train, batch_size, embedding):
@@ -117,7 +105,8 @@ def get_batch(train, batch_size, embedding):
     question_len = train[1][1][indexes]
     answer_begin = train[2][0][indexes]
     answer_end = train[2][1][indexes]
-    return ((context, context_len),
+    return (
+            (context, context_len),
             (question, question_len),
             (answer_begin, answer_end)
            )

@@ -5,10 +5,11 @@ from tqdm import tqdm
 import numpy as np
 import tensorflow as tf
 
-BATCH_SIZE = 32
+BATCH_SIZE = 200
 EPOCHS = 10
 EMBEDDING_SIZE = 300
-RNN_HIDDEN_SIZE = 128
+RNN_HIDDEN_SIZE = 256
+SOFT_ACCURACY = 2
 
 def rnn_cell():
     return tf.nn.rnn_cell.LSTMCell(RNN_HIDDEN_SIZE)
@@ -82,7 +83,8 @@ class Model:
                     question_outputs, question_state,
                     context_outputs, context_state
             )
-            self.__summary_all()
+            if self.__logs:
+                self.__summary_all()
 
             optimizer = tf.train.AdamOptimizer(0.0001)
             gradients, variables = zip(*optimizer.compute_gradients(self.loss))
@@ -138,52 +140,56 @@ class Model:
             question_outputs, question_state,
             context_outputs, context_state
     ):
-        prob_begin = tf.layers.dense(
+        dense_begin = tf.layers.dense(
                 inputs=context_outputs,
                 units=2*RNN_HIDDEN_SIZE,
-                use_bias=True
+                use_bias=True,
+                name='dense_begin'
         )
-        prob_end = tf.layers.dense(
+        dense_end = tf.layers.dense(
                 inputs=context_outputs,
                 units=2*RNN_HIDDEN_SIZE,
-                use_bias=True
+                use_bias=True,
+                name='dense_end'
         )
         # TODO
-        prob_begin = tf.matmul(prob_begin,
+        points_begin = tf.matmul(
+                dense_begin,
                 tf.reshape(question_state[0],
                     (batch_size, 2*RNN_HIDDEN_SIZE, 1)
-                )
+                ),
+                name='points_begin'
         )
-        prob_end = tf.matmul(prob_end,
+        points_end = tf.matmul(
+                dense_end,
                 tf.reshape(question_state[0],
                     (batch_size, 2*RNN_HIDDEN_SIZE, 1)
-                )
+                ),
+                name='points_end'
         )
-        prob_begin = tf.reshape(prob_begin, tf.shape(prob_begin)[:-1])
-        prob_end = tf.reshape(prob_end, tf.shape(prob_end)[:-1])
-        loss_begin = tf.reduce_mean(
-            tf.nn.sparse_softmax_cross_entropy_with_logits(
+        points_begin = tf.reshape(points_begin, tf.shape(points_begin)[:-1])
+        points_end = tf.reshape(points_end, tf.shape(points_end)[:-1])
+        softmax_begin = tf.nn.sparse_softmax_cross_entropy_with_logits(
                 labels=self.true_answer_begin,
-                logits=prob_begin,
+                logits=points_begin,
                 name="softmax_begin"
-            )
         )
-        loss_end = tf.reduce_mean(
-            tf.nn.sparse_softmax_cross_entropy_with_logits(
+        softmax_end = tf.nn.sparse_softmax_cross_entropy_with_logits(
                 labels=self.true_answer_end,
-                logits=prob_end,
+                logits=points_end,
                 name="softmax_end"
-            )
         )
+        loss_end = tf.reduce_mean(softmax_end, name='loss_end')
+        loss_begin = tf.reduce_mean(softmax_begin, name='loss_begin')
         self.loss = tf.add(loss_begin, loss_end, name='loss')
         self.answer_begin = tf.argmax(
-                prob_begin,
+                softmax_begin,
                 name='answer_begin',
                 axis=-1,
                 output_type=tf.int32
         )
         self.answer_end = tf.argmax(
-                prob_end,
+                softmax_end,
                 name='answer_end',
                 axis=-1,
                 output_type=tf.int32
@@ -218,6 +224,51 @@ class Model:
                 dtype=tf.float32
             ) * 100 / tf.cast(tf.size(good_end), dtype=tf.float32)
         )
+        # soft
+        soft_good_begin = tf.logical_or(
+            tf.less_equal(
+                self.true_answer_begin,
+                self.answer_begin
+            ),
+            tf.less_equal(
+                self.answer_begin,
+                self.true_answer_begin
+            )
+        )
+        soft_good_end = tf.logical_or(
+            tf.less_equal(
+                self.true_answer_end,
+                self.answer_end
+            ),
+            tf.less_equal(
+                self.answer_end,
+                self.true_answer_end
+            )
+        )
+        tf.summary.scalar('soft answer begin accuracy',
+            tf.count_nonzero(
+                soft_good_begin,
+                dtype=tf.float32
+            ) * 100 / tf.cast(tf.size(soft_good_begin), dtype=tf.float32)
+        )
+        tf.summary.scalar('soft answer end accuracy',
+            tf.count_nonzero(
+                soft_good_end,
+                dtype=tf.float32
+            ) * 100 / tf.cast(tf.size(soft_good_end), dtype=tf.float32)
+        )
+        tf.summary.scalar('soft answer begin or end accuracy',
+            tf.count_nonzero(
+                tf.logical_or(soft_good_begin, soft_good_end),
+                dtype=tf.float32
+            ) * 100 / tf.cast(tf.size(soft_good_end), dtype=tf.float32)
+        )
+        tf.summary.scalar('soft answer begin and end accuracy',
+            tf.count_nonzero(
+                tf.logical_and(soft_good_begin, soft_good_end),
+                dtype=tf.float32
+            ) * 100 / tf.cast(tf.size(soft_good_end), dtype=tf.float32)
+        )
         self.summary = tf.summary.merge_all()
         self.writer = tf.summary.FileWriter(LOGS_PATH, graph=self.graph)
     # __summary_all
@@ -230,10 +281,18 @@ class Model:
             print("Done.")
     # init_variables
 
-    def train_model(self, session, train, batch_size, epochs=EPOCHS):
+    def train_model(
+            self,
+            session,
+            train,
+            test,
+            batch_size,
+            test_every=100,
+            steps=10000
+    ):
         avg_loss = 0
         #TODO
-        for i in tqdm(range(EPOCHS * 1000)):
+        for i in tqdm(range(steps)):
             batch = get_batch(train, batch_size, self.__embeddings)
             context, context_len = batch[0]
             question, question_len = batch[1]

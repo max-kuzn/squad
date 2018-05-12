@@ -15,7 +15,6 @@ def main():
     print("Start train")
     m.train_model(sess, train, 200, 10)
 
-
 if __name__ == "__main__":
     main()
 

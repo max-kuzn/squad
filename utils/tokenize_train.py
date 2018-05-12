@@ -7,39 +7,6 @@ from tqdm import tqdm
 all_qas = 0
 good_qas = 0
 
-'''
-from nltk.tokenize import RegexpTokenizer
-tokenizer = RegexpTokenizer('\w+|\$[\d]+|\S+')
-words = [w.lower() for w in tokenized if w.isalnum()]
-'''
-
-'''
-def tokenize(text):
-    return text
-#tokenize
-'''
-
-'''
-Generate json file
-
-{
-  "paragraphs": [
-    {
-      "context": ["bla", "bla", ..., "."],
-      "qas": [
-        {
-          "question": ["What", "bla", ..., "?"],
-          "answer_begin": 10,
-          "answer_end": 13
-        }
-      ]
-    },
-    ...,
-    {}
-  ]
-}
-'''
-
 def tokenize(string):
     tokenizer = subprocess.Popen(
             [TOKENIZER_PATH],
