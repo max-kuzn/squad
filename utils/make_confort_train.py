@@ -5,7 +5,7 @@ import numpy as np
 from tqdm import tqdm
 
 def main():
-    data = json.load(open(EMBEDDED_TRAIN_PATH))
+    data = json.load(open(EMBEDDED_TEST_PATH))
     n = 0
     max_context_len = 0
     max_question_len = 0
@@ -40,7 +40,7 @@ def main():
     question_data = (question, question_len)
     answer_data = (answer_begin, answer_end)
     comfort_data = (context_data, question_data, answer_data)
-    np.savez(COMFORT_TRAIN_PATH,
+    np.savez(COMFORT_TEST_PATH,
             context=context, context_len=context_len,
             question=question, question_len=question_len,
             answer_begin=answer_begin, answer_end=answer_end

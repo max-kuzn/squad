@@ -14,7 +14,7 @@ def main():
     train_emb = np.empty((voc_size, emb_size), dtype=np.float32)
     for i in tqdm(range(voc_size)):
         train_emb[i] = model.get_word_vector(i2w[i])
-    np.save(TRAIN_EMBEDDING_PATH, train_emb)
+    np.save(KNOWN_EMBEDDING_PATH, train_emb)
     print("Shape =", train_emb.shape)
 #main
 

@@ -30,7 +30,7 @@ def main():
     w2i = dict()
     for i in range(len(i2w)):
         w2i[i2w[i]] = i
-    data = json.load(open(TOKENIZED_TRAIN_PATH, 'r'))
+    data = json.load(open(TOKENIZED_TEST_PATH, 'r'))
 
     emb_data = dict()
     emb_data['paragraphs'] = list()
@@ -38,7 +38,7 @@ def main():
     for par in tqdm(data['paragraphs']):
         emb_data['paragraphs'].append(embed_paragraph(par, w2i))
 
-    with open(EMBEDDED_TRAIN_PATH, 'w') as out:
+    with open(EMBEDDED_TEST_PATH, 'w') as out:
         json.dump(emb_data, out, indent='  ')
 
 if __name__ == "__main__":

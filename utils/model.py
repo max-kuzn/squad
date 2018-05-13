@@ -91,6 +91,7 @@ class Model:
             gradients, _ = tf.clip_by_global_norm(gradients, 5000)
             self.train_step = optimizer.apply_gradients(zip(gradients, variables))
             self.init = tf.global_variables_initializer()
+            self.saver = tf.train.Saver()
     # __setup_model
 
     def __setup_inputs(self):
@@ -354,13 +355,11 @@ class Model:
     # validate
 
     def save_model(self, session, path=MODEL_PATH):
-        saver = tf.train.Saver()
-        saver.save(session, path)
+        self.saver.save(session, path)
     # save_movel
 
     def load_model(self, session, path=MODEL_PATH):
-        saver = tf.train.Saver()
-        saver.restore(session, path)
+        self.saver.restore(session, path)
     # load_model
 
 # Model

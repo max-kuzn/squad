@@ -22,7 +22,7 @@ class Embedding:
     def __init__(
             self,
             mode="train", # Can be "train", "test", "both"
-            path_to_train=TRAIN_EMBEDDING_PATH,
+            path_to_train=KNOWN_EMBEDDING_PATH,
             path_to_train_index2word=INDEX2WORD_PATH,
             path_to_bin=ALL_EMBEDDING_PATH
     ):
@@ -43,7 +43,7 @@ class Embedding:
 
     def __load_train_embeddings(
             self,
-            path_to_emb=TRAIN_EMBEDDING_PATH,
+            path_to_emb=KNOWN_EMBEDDING_PATH,
             path_to_i2w=INDEX2WORD_PATH
     ):
         self.__train_embeddings = np.load(path_to_emb)
