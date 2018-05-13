@@ -1,6 +1,7 @@
 from constants import *
 from util import tokenize
 
+import subprocess
 import json
 from tqdm import tqdm
 
@@ -60,7 +61,7 @@ def tokenize_paragraph(par):
 #tokenize_paragraph
 
 def main():
-    jdata = json.load(open(RAW_TRAIN_PATH, 'r'))
+    jdata = json.load(open(RAW_TEST_PATH, 'r'))
 
     par = jdata['data'][0]['paragraphs'][0]
     tokenize_data = dict()
@@ -69,7 +70,7 @@ def main():
     for data in tqdm(jdata['data']):
         for par in data['paragraphs']:
             tokenize_data['paragraphs'].append(tokenize_paragraph(par))
-    with open(TOKENIZED_TRAIN_PATH, "w") as out:
+    with open(TOKENIZED_TEST_PATH, "w") as out:
         json.dump(tokenize_data, out, indent='  ')
     print(str(good_qas) + '/' + str(all_qas))
     print(good_qas / all_qas * 100)

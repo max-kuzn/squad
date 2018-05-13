@@ -262,8 +262,32 @@ class Model:
                 dtype=tf.float32
             ) * 100 / tf.cast(tf.size(soft_good_end), dtype=tf.float32)
         )
+        # f1 score
+        TP = tf.nn.relu(
+            tf.subtract(
+                tf.minimum(self.answer_end, self.true_answer_end),
+                tf.maximum(self.answer_begin, self.true_answer_begin)
+            ),
+            name='TP'
+        )
+        FPN = tf.nn.relu(
+            tf.subtract(
+                tf.subtract(
+                    tf.maximum(self.answer_end, self.true_answer_end),
+                    tf.minimum(self.answer_begin, self.true_answer_begin)
+                ),
+                TP
+            ),
+            name='FPN'
+        )
+        tf.summary.scalar('F1 score',
+            tf.reduce_mean(
+                2 * TP / (2 * TP + FPN)
+            )
+        )
         self.summary = tf.summary.merge_all()
-        self.writer = tf.summary.FileWriter(LOGS_PATH, graph=self.graph)
+        self.train_writer = tf.summary.FileWriter(LOGS_PATH + SEP + "train", graph=self.graph)
+        self.test_writer = tf.summary.FileWriter(LOGS_PATH + SEP + "test")
     # __summary_all
 
     def init_variables(self, session):
@@ -306,17 +330,37 @@ class Model:
                     }
                 )
             #TODO
-            self.writer.add_summary(summary, i)
+            self.train_writer.add_summary(summary, i)
+            if (i + 1) % test_every == 0:
+                self.validate(session, test)
     # train_model
 
+    def validate(self, session, test):
+        batch = get_batch(test, test[0][0].shape[0], self.__embeddings)
+        summary = session.run(
+                [
+                    self.summary
+                ],
+                {
+                    self.context: batch[0][0],
+                    self.context_len: batch[0][1],
+                    self.question: batch[1][0],
+                    self.question_len: batch[1][1],
+                    self.true_answer_begin: batch[2][0],
+                    self.true_answer_end: batch[2][1]
+                }
+            )
+        self.test_writer.add_summary(summary, i)
+    # validate
+
     def save_model(self, session, path=MODEL_PATH):
-        #TODO
-        return
+        saver = tf.train.Saver()
+        saver.save(session, path)
     # save_movel
 
     def load_model(self, session, path=MODEL_PATH):
-        #TODO
-        return
+        saver = tf.train.Saver()
+        saver.restore(session, path)
     # load_model
 
 # Model

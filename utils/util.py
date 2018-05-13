@@ -96,15 +96,15 @@ def load_train(path=COMFORT_TRAIN_PATH):
            )
 # load_train
 
-def get_batch(train, batch_size, embedding):
-    N = train[0][0].shape[0]
+def get_batch(data, batch_size, embedding):
+    N = data[0][0].shape[0]
     indexes = np.random.choice(N, batch_size, replace=False)
-    context = embedding.get_known(train[0][0][indexes])
-    context_len = train[0][1][indexes]
-    question = embedding.get_known(train[1][0][indexes])
-    question_len = train[1][1][indexes]
-    answer_begin = train[2][0][indexes]
-    answer_end = train[2][1][indexes]
+    context = embedding.get_known(data[0][0][indexes])
+    context_len = data[0][1][indexes]
+    question = embedding.get_known(data[1][0][indexes])
+    question_len = data[1][1][indexes]
+    answer_begin = data[2][0][indexes]
+    answer_end = data[2][1][indexes]
     return (
             (context, context_len),
             (question, question_len),
