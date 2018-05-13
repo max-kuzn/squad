@@ -49,6 +49,6 @@ KNOWN_EMBEDDING = "known_embedding.npy"
 KNOWN_EMBEDDING_PATH = DATA_PATH + SEP + KNOWN_EMBEDDING
 
 # Model
-MODEL = "model.meta"
+MODEL = "model"
 MODEL_PATH = DATA_PATH + SEP + "model" + SEP + MODEL
 

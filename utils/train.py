@@ -13,23 +13,22 @@ def split_data(data, test_part=0.05):
 '''
 
 def main():
-    print("Loading train data...")
+    print("Loading data...")
     train = load_train()
+    test = load_test()
     print("Done.\n")
-    # train, test = split_data(data)
     m = Model()
     sess = tf.Session(graph=m.graph)
     m.init_variables(sess)
     print("\n\n")
     print("Start train")
-    test = 0
     m.train_model(
             sess,
             train,
-            0,
-            steps=1,
+            test,
+            steps=200,
             batch_size=200,
-            test_every=1000
+            test_every=200
     )
     m.save_model(sess)
 # main

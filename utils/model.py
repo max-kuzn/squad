@@ -288,7 +288,7 @@ class Model:
         )
         self.summary = tf.summary.merge_all()
         self.train_writer = tf.summary.FileWriter(LOGS_PATH + SEP + "train", graph=self.graph)
-        self.test_writer = tf.summary.FileWriter(LOGS_PATH + SEP + "test")
+        self.test_writer = tf.summary.FileWriter(LOGS_PATH + SEP + "test", graph=self.graph)
     # __summary_all
 
     def init_variables(self, session):
@@ -304,54 +304,52 @@ class Model:
             session,
             train,
             test,
-            batch_size=200,
-            test_every=100,
-            steps=10000
+            batch_size=BATCH_SIZE,
+            test_every=None,
+            epochs=1
     ):
-        avg_loss = 0
-        #TODO
-        for i in tqdm(range(steps)):
-            batch = get_batch(train, batch_size, self.__embeddings)
-            context, context_len = batch[0]
-            question, question_len = batch[1]
-            true_answer_begin, true_answer_end = batch[2]
-            summary, _, answer_begin = session.run(
-                    [
-                        self.summary,
-                        self.train_step,
-                        self.answer_begin
-                    ],
-                    {
-                        self.context: context,
-                        self.context_len: context_len,
-                        self.question: question,
-                        self.question_len: question_len,
-                        self.true_answer_begin: true_answer_begin,
-                        self.true_answer_end: true_answer_end
-                    }
-                )
-            #TODO
-            self.train_writer.add_summary(summary, i)
-            if (i + 1) % test_every == 0:
-                self.validate(session, test)
+        for e in range(epochs):
+            i = 0
+            for batch in naxt_batch(train, batch_size, self.__embeddings):
+                i += 1
+                batch = get_batch(train, batch_size, self.__embeddings)
+                context, context_len = batch[0]
+                question, question_len = batch[1]
+                true_answer_begin, true_answer_end = batch[2]
+                summary, _ = session.run(
+                        [
+                            self.summary,
+                            self.train_step
+                        ],
+                        {
+                            self.context: context,
+                            self.context_len: context_len,
+                            self.question: question,
+                            self.question_len: question_len,
+                            self.true_answer_begin: true_answer_begin,
+                            self.true_answer_end: true_answer_end
+                        }
+                    )
+                #TODO
+                self.train_writer.add_summary(summary, i)
+                if test_every != None and i % test_every == 0:
+                    self.validate(session, test, e, batch_size=BATCH_SIZE)
     # train_model
 
-    def validate(self, session, test):
-        batch = get_batch(test, test[0][0].shape[0], self.__embeddings)
-        summary = session.run(
-                [
-                    self.summary
-                ],
-                {
-                    self.context: batch[0][0],
-                    self.context_len: batch[0][1],
-                    self.question: batch[1][0],
-                    self.question_len: batch[1][1],
-                    self.true_answer_begin: batch[2][0],
-                    self.true_answer_end: batch[2][1]
-                }
-            )
-        self.test_writer.add_summary(summary, i)
+    def validate(self, session, test, epoch, batch_size=BATCH_SIZE):
+        for batch in next_batch(test, batch_size, self.__embeddings)
+            summary = session.run(
+                    self.summary,
+                    {
+                        self.context: batch[0][0],
+                        self.context_len: batch[0][1],
+                        self.question: batch[1][0],
+                        self.question_len: batch[1][1],
+                        self.true_answer_begin: batch[2][0],
+                        self.true_answer_end: batch[2][1]
+                    }
+                )
+            self.test_writer.add_summary(summary, epoch)
     # validate
 
     def save_model(self, session, path=MODEL_PATH):

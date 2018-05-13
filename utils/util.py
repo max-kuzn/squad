@@ -96,18 +96,44 @@ def load_train(path=COMFORT_TRAIN_PATH):
            )
 # load_train
 
-def get_batch(data, batch_size, embedding):
-    N = data[0][0].shape[0]
-    indexes = np.random.choice(N, batch_size, replace=False)
-    context = embedding.get_known(data[0][0][indexes])
-    context_len = data[0][1][indexes]
-    question = embedding.get_known(data[1][0][indexes])
-    question_len = data[1][1][indexes]
-    answer_begin = data[2][0][indexes]
-    answer_end = data[2][1][indexes]
+def load_test(path=COMFORT_TEST_PATH):
+    data = np.load(path)
+    return (
+            (data['context'], data['context_len']),
+            (data['question'], data['question_len']),
+            (data['answer_begin'], data['answer_end'])
+           )
+# load_train
+
+def get_batch(data, l, r, embedding):
+    context = embedding.get_known(data[0][0][l:r])
+    context_len = data[0][1][l:r]
+    question = embedding.get_known(data[1][0][l:r])
+    question_len = data[1][1][l:r]
+    answer_begin = data[2][0][l:r]
+    answer_end = data[2][1][l:r]
     return (
             (context, context_len),
             (question, question_len),
             (answer_begin, answer_end)
            )
 # get_batch
+
+def shuffle(data):
+    shuffle = np.random.permutation(data[0][0].shape[0])
+    data[0][0] = data[0][0][shuffle]
+    data[0][1] = data[0][1][shuffle]
+    data[1][0] = data[1][0][shuffle]
+    data[1][1] = data[1][1][shuffle]
+    data[2][0] = data[2][0][shuffle]
+    data[2][1] = data[2][1][shuffle]
+    return data
+# shuffle
+
+def next_batch(data, batch_size, embedding):
+    data = shuffle(data)
+    for l in range(0, data[0][0].shape[0], batch_size):
+        r = min(l + batch_size, data[0][0].shape[0])
+        return get_batch(data, l, r, embedding)
+# next_batch
+
