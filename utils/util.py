@@ -116,7 +116,7 @@ def get_batch(data, l, r, embedding):
             (context, context_len),
             (question, question_len),
             (answer_begin, answer_end)
-           )
+        )
 # get_batch
 
 def shuffle(data):
@@ -138,6 +138,6 @@ def next_batch(data, batch_size, embedding):
     data = shuffle(data)
     for l in range(0, data[0][0].shape[0], batch_size):
         r = min(l + batch_size, data[0][0].shape[0])
-        return get_batch(data, l, r, embedding)
+        yield get_batch(data, l, r, embedding)
 # next_batch
 

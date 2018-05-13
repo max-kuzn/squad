@@ -16,6 +16,9 @@ def rnn_cell():
 # rnn_cell
 
 def bidirect_cell(inputs, inputs_len, initial_state=None):
+    print("_____________")
+    print(initial_state)
+    print("_____________")
     out = tf.nn.bidirectional_dynamic_rnn(
             cell_fw=rnn_cell(),
             cell_bw=rnn_cell(),
@@ -26,8 +29,9 @@ def bidirect_cell(inputs, inputs_len, initial_state=None):
             dtype=tf.float32
         )
     outputs, states = out
+    print(states[0])
     #TODO
-    return tf.concat(outputs, -1), tf.concat(states, -1)
+    return outputs, states
 # bidirect_cell
 
 class Model:
@@ -83,12 +87,11 @@ class Model:
                     question_outputs, question_state,
                     context_outputs, context_state
             )
-            if self.__logs:
-                self.__summary_all()
+            self.__summary_all()
 
-            optimizer = tf.train.AdamOptimizer(0.0001)
+            optimizer = tf.train.RMSPropOptimizer(0.001)
             gradients, variables = zip(*optimizer.compute_gradients(self.loss))
-            gradients, _ = tf.clip_by_global_norm(gradients, 5000)
+            gradients, _ = tf.clip_by_global_norm(gradients, 100)
             self.train_step = optimizer.apply_gradients(zip(gradients, variables))
             self.init = tf.global_variables_initializer()
             self.saver = tf.train.Saver()
@@ -133,7 +136,7 @@ class Model:
 
     def __setup_context(self, question_outputs, question_state):
         return bidirect_cell(self.context, self.context_len,
-            initial_state=None #question_state
+            initial_state=tf.reduce_mean(question_state, axis=0)
         )
     # __setup_context()
 
@@ -143,28 +146,28 @@ class Model:
     ):
         dense_begin = tf.layers.dense(
                 inputs=context_outputs,
-                units=2*RNN_HIDDEN_SIZE,
+                units=4*RNN_HIDDEN_SIZE,
                 use_bias=True,
                 name='dense_begin'
         )
         dense_end = tf.layers.dense(
                 inputs=context_outputs,
-                units=2*RNN_HIDDEN_SIZE,
+                units=4*RNN_HIDDEN_SIZE,
                 use_bias=True,
                 name='dense_end'
         )
         # TODO
         points_begin = tf.matmul(
                 dense_begin,
-                tf.reshape(question_state[0],
-                    (batch_size, 2*RNN_HIDDEN_SIZE, 1)
+                tf.reshape(question_state,
+                    (batch_size, 4*RNN_HIDDEN_SIZE, 1)
                 ),
                 name='points_begin'
         )
         points_end = tf.matmul(
                 dense_end,
-                tf.reshape(question_state[0],
-                    (batch_size, 2*RNN_HIDDEN_SIZE, 1)
+                tf.reshape(question_state,
+                    (batch_size, 4*RNN_HIDDEN_SIZE, 1)
                 ),
                 name='points_end'
         )
@@ -189,7 +192,6 @@ class Model:
                 axis=-1,
                 output_type=tf.int32
         )
-        print(self.answer_begin)
         self.answer_end = tf.argmax(
                 points_end,
                 name='answer_end',
@@ -310,11 +312,7 @@ class Model:
     ):
         step = 0
         for e in range(epochs):
-            for (
-                    (context, context_len),
-                    (question, quiestion_len),
-                    (answer_begin, answer_end)
-            ) in next_batch(train, batch_size, self.__embeddings):
+            for batch in tqdm(next_batch(train, batch_size, self.__embeddings)):
                 step += 1
                 summary, _ = session.run(
                         [
@@ -322,15 +320,14 @@ class Model:
                             self.train_step
                         ],
                         {
-                            self.context: c[0],
-                            self.context_len: c[1],
-                            self.question: q[0],
-                            self.question_len: q[1],
-                            self.true_answer_begin: a[0],
-                            self.true_answer_end: a[1]
+                            self.context: batch[0][0],
+                            self.context_len: batch[0][1],
+                            self.question: batch[1][0],
+                            self.question_len: batch[1][1],
+                            self.true_answer_begin: batch[2][0],
+                            self.true_answer_end: batch[2][1]
                         }
                     )
-                #TODO
                 self.train_writer.add_summary(summary, step)
                 if test_every != None and step % test_every == 0:
                     self.validate(session, test, step, batch_size=BATCH_SIZE)
@@ -350,6 +347,8 @@ class Model:
                     }
                 )
             self.test_writer.add_summary(summary, x)
+            print("writed")
+            break
     # validate
 
     def save_model(self, session, path=MODEL_PATH):
