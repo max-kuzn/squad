@@ -308,36 +308,36 @@ class Model:
             test_every=None,
             epochs=1
     ):
+        step = 0
         for e in range(epochs):
-            i = 0
-            for batch in naxt_batch(train, batch_size, self.__embeddings):
-                i += 1
-                batch = get_batch(train, batch_size, self.__embeddings)
-                context, context_len = batch[0]
-                question, question_len = batch[1]
-                true_answer_begin, true_answer_end = batch[2]
+            for (
+                    (context, context_len),
+                    (question, quiestion_len),
+                    (answer_begin, answer_end)
+            ) in next_batch(train, batch_size, self.__embeddings):
+                step += 1
                 summary, _ = session.run(
                         [
                             self.summary,
                             self.train_step
                         ],
                         {
-                            self.context: context,
-                            self.context_len: context_len,
-                            self.question: question,
-                            self.question_len: question_len,
-                            self.true_answer_begin: true_answer_begin,
-                            self.true_answer_end: true_answer_end
+                            self.context: c[0],
+                            self.context_len: c[1],
+                            self.question: q[0],
+                            self.question_len: q[1],
+                            self.true_answer_begin: a[0],
+                            self.true_answer_end: a[1]
                         }
                     )
                 #TODO
-                self.train_writer.add_summary(summary, i)
-                if test_every != None and i % test_every == 0:
-                    self.validate(session, test, e, batch_size=BATCH_SIZE)
+                self.train_writer.add_summary(summary, step)
+                if test_every != None and step % test_every == 0:
+                    self.validate(session, test, step, batch_size=BATCH_SIZE)
     # train_model
 
-    def validate(self, session, test, epoch, batch_size=BATCH_SIZE):
-        for batch in next_batch(test, batch_size, self.__embeddings)
+    def validate(self, session, test, x, batch_size=BATCH_SIZE):
+        for batch in next_batch(test, batch_size, self.__embeddings):
             summary = session.run(
                     self.summary,
                     {
@@ -349,7 +349,7 @@ class Model:
                         self.true_answer_end: batch[2][1]
                     }
                 )
-            self.test_writer.add_summary(summary, epoch)
+            self.test_writer.add_summary(summary, x)
     # validate
 
     def save_model(self, session, path=MODEL_PATH):

@@ -26,7 +26,7 @@ def main():
             sess,
             train,
             test,
-            steps=200,
+            epochs=1,
             batch_size=200,
             test_every=200
     )

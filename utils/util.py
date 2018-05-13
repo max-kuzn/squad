@@ -121,13 +121,17 @@ def get_batch(data, l, r, embedding):
 
 def shuffle(data):
     shuffle = np.random.permutation(data[0][0].shape[0])
-    data[0][0] = data[0][0][shuffle]
-    data[0][1] = data[0][1][shuffle]
-    data[1][0] = data[1][0][shuffle]
-    data[1][1] = data[1][1][shuffle]
-    data[2][0] = data[2][0][shuffle]
-    data[2][1] = data[2][1][shuffle]
-    return data
+    context = data[0][0][shuffle]
+    context_len = data[0][1][shuffle]
+    question = data[1][0][shuffle]
+    question_len = data[1][1][shuffle]
+    answer_begin = data[2][0][shuffle]
+    answer_end = data[2][1][shuffle]
+    return (
+            (context, context_len),
+            (question, question_len),
+            (answer_begin, answer_end)
+           )
 # shuffle
 
 def next_batch(data, batch_size, embedding):
