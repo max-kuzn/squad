@@ -8,8 +8,8 @@ import tensorflow as tf
 BATCH_SIZE = 200
 EPOCHS = 10
 EMBEDDING_SIZE = 300
-RNN_HIDDEN_SIZE = 256
-SOFT_ACCURACY = 2
+RNN_HIDDEN_SIZE = 128
+SOFT = 2
 
 def rnn_cell():
     return tf.nn.rnn_cell.LSTMCell(RNN_HIDDEN_SIZE)
@@ -183,13 +183,14 @@ class Model:
         loss_begin = tf.reduce_mean(softmax_begin, name='loss_begin')
         self.loss = tf.add(loss_begin, loss_end, name='loss')
         self.answer_begin = tf.argmax(
-                softmax_begin,
+                points_begin,
                 name='answer_begin',
                 axis=-1,
                 output_type=tf.int32
         )
+        print(self.answer_begin)
         self.answer_end = tf.argmax(
-                softmax_end,
+                points_end,
                 name='answer_end',
                 axis=-1,
                 output_type=tf.int32
@@ -206,6 +207,7 @@ class Model:
                 dtype=tf.float32
             ) * 100 / tf.cast(tf.size(good_begin), dtype=tf.float32)
         )
+        '''
         tf.summary.scalar('answer end accuracy',
             tf.count_nonzero(
                 good_end,
@@ -218,6 +220,7 @@ class Model:
                 dtype=tf.float32
             ) * 100 / tf.cast(tf.size(good_end), dtype=tf.float32)
         )
+        '''
         tf.summary.scalar('answer begin and end accuracy',
             tf.count_nonzero(
                 tf.logical_and(good_begin, good_end),
@@ -225,32 +228,21 @@ class Model:
             ) * 100 / tf.cast(tf.size(good_end), dtype=tf.float32)
         )
         # soft
-        soft_good_begin = tf.logical_or(
-            tf.less_equal(
-                self.true_answer_begin,
-                self.answer_begin
-            ),
-            tf.less_equal(
-                self.answer_begin,
-                self.true_answer_begin
-            )
+        difference_begin = tf.abs(
+            tf.subtract(self.true_answer_begin, self.answer_begin)
         )
-        soft_good_end = tf.logical_or(
-            tf.less_equal(
-                self.true_answer_end,
-                self.answer_end
-            ),
-            tf.less_equal(
-                self.answer_end,
-                self.true_answer_end
-            )
+        difference_end = tf.abs(
+            tf.subtract(self.true_answer_end, self.answer_end)
         )
+        soft_good_begin = tf.less_equal(difference_begin, SOFT)
+        soft_good_end = tf.less_equal(difference_end, SOFT)
         tf.summary.scalar('soft answer begin accuracy',
             tf.count_nonzero(
                 soft_good_begin,
                 dtype=tf.float32
             ) * 100 / tf.cast(tf.size(soft_good_begin), dtype=tf.float32)
         )
+        '''
         tf.summary.scalar('soft answer end accuracy',
             tf.count_nonzero(
                 soft_good_end,
@@ -263,6 +255,7 @@ class Model:
                 dtype=tf.float32
             ) * 100 / tf.cast(tf.size(soft_good_end), dtype=tf.float32)
         )
+        '''
         tf.summary.scalar('soft answer begin and end accuracy',
             tf.count_nonzero(
                 tf.logical_and(soft_good_begin, soft_good_end),
@@ -286,7 +279,7 @@ class Model:
             session,
             train,
             test,
-            batch_size,
+            batch_size=200,
             test_every=100,
             steps=10000
     ):
@@ -297,10 +290,11 @@ class Model:
             context, context_len = batch[0]
             question, question_len = batch[1]
             true_answer_begin, true_answer_end = batch[2]
-            summary, _ = session.run(
+            summary, _, answer_begin = session.run(
                     [
                         self.summary,
-                        self.train_step
+                        self.train_step,
+                        self.answer_begin
                     ],
                     {
                         self.context: context,
