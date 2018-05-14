@@ -28,7 +28,8 @@ def main():
             test,
             epochs=1,
             batch_size=200,
-            test_every=50
+            train_summary_every=10,
+            test_summary_every=50
     )
     m.save_model(sess)
 # main

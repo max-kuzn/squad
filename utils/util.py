@@ -105,6 +105,22 @@ def load_test(path=COMFORT_TEST_PATH):
            )
 # load_train
 
+def get_random_batch(data, batch_size, embedding):
+    n = data[0][0].shape[0]
+    indexes = np.random.choice(n, batch_size, replace=False)
+    context = embedding.get_known(data[0][0][indexes])
+    context_len = data[0][1][indexes]
+    question = embedding.get_known(data[1][0][indexes])
+    question_len = data[1][1][indexes]
+    answer_begin = data[2][0][indexes]
+    answer_end = data[2][1][indexes]
+    return (
+            (context, context_len),
+            (question, question_len),
+            (answer_begin, answer_end)
+        )
+# get_random_batch
+
 def get_batch(data, l, r, embedding):
     context = embedding.get_known(data[0][0][l:r])
     context_len = data[0][1][l:r]

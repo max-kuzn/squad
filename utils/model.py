@@ -11,17 +11,21 @@ EMBEDDING_SIZE = 300
 RNN_HIDDEN_SIZE = 128
 SOFT = 2
 
-def rnn_cell():
-    return tf.nn.rnn_cell.LSTMCell(RNN_HIDDEN_SIZE)
+def rnn_cell(hidden_size):
+    return tf.nn.rnn_cell.LSTMCell(hidden_size)
 # rnn_cell
 
-def bidirect_cell(inputs, inputs_len, initial_state=None):
-    print("_____________")
-    print(initial_state)
-    print("_____________")
+def bidirect_cell(
+        inputs,
+        inputs_len,
+        outputs_mode=None,
+        states_mode=None,
+        hidden_size=RNN_HIDDEN_SIZE,
+        initial_state=None
+):
     out = tf.nn.bidirectional_dynamic_rnn(
-            cell_fw=rnn_cell(),
-            cell_bw=rnn_cell(),
+            cell_fw=rnn_cell(hidden_size),
+            cell_bw=rnn_cell(hidden_size),
             inputs=inputs,
             sequence_length=inputs_len,
             initial_state_fw=initial_state,
@@ -29,7 +33,24 @@ def bidirect_cell(inputs, inputs_len, initial_state=None):
             dtype=tf.float32
         )
     outputs, states = out
-    print(states[0])
+    if outs_mode == "concat":
+        print("_______________")
+        print(outputs)
+        print("_______________")
+        outputs = tf.concat(outputs, axis=2)
+        print(outputs)
+        print("_______________")
+    elif outs_mode == "sum":
+        outputs = tf.sum(outputs, axis=2)
+    if states_mode == "concat":
+        states = tf.concat(states, axis=0)
+    elif states_mode == "concat_all":
+        states = tf.concat(states, axis=0)
+        states = tf.concat(states, axis=0)
+    elif states_mode = "sum":
+        states = tf.sum(states, axis=0)
+    elif states_mode = "sum_all":
+        states = tf.sum(states, axis=0)
     #TODO
     return outputs, states
 # bidirect_cell
@@ -115,23 +136,19 @@ class Model:
         )
         self.question_len = tf.placeholder(
             tf.int32,
-            name="question_lenght",
-            shape=(None)
-        )
-        self.true_answer_begin = tf.placeholder(
-            tf.int32,
-            name="true_answer_begin",
-            shape=(None)
-        )
-        self.true_answer_end = tf.placeholder(
-            tf.int32,
             name="true_answer_end",
             shape=(None)
         )
     # __setup_inputs
 
     def __setup_question(self):
-        return bidirect_cell(self.question, self.question_len)
+        print(bidirect_cell)
+        question_layer1 = bidirect_cell(
+                self.question,
+                self.question_len,
+                mode="concat"
+            )
+        return question_layer1
     # __setup_question
 
     def __setup_context(self, question_outputs, question_state):
@@ -205,10 +222,9 @@ class Model:
         good_begin = tf.equal(self.true_answer_begin, self.answer_begin)
         good_end = tf.equal(self.true_answer_end, self.answer_end)
         tf.summary.scalar('answer begin accuracy',
-            tf.count_nonzero(
-                good_begin,
-                dtype=tf.float32
-            ) * 100 / tf.cast(tf.size(good_begin), dtype=tf.float32)
+            tf.reduce_mean(
+                good_begin
+            )
         )
         '''
         tf.summary.scalar('answer end accuracy',
@@ -225,45 +241,11 @@ class Model:
         )
         '''
         tf.summary.scalar('answer begin and end accuracy',
-            tf.count_nonzero(
-                tf.logical_and(good_begin, good_end),
-                dtype=tf.float32
-            ) * 100 / tf.cast(tf.size(good_end), dtype=tf.float32)
-        )
-        # soft
-        difference_begin = tf.abs(
-            tf.subtract(self.true_answer_begin, self.answer_begin)
-        )
-        difference_end = tf.abs(
-            tf.subtract(self.true_answer_end, self.answer_end)
-        )
-        soft_good_begin = tf.less_equal(difference_begin, SOFT)
-        soft_good_end = tf.less_equal(difference_end, SOFT)
-        tf.summary.scalar('soft answer begin accuracy',
-            tf.count_nonzero(
-                soft_good_begin,
-                dtype=tf.float32
-            ) * 100 / tf.cast(tf.size(soft_good_begin), dtype=tf.float32)
-        )
-        '''
-        tf.summary.scalar('soft answer end accuracy',
-            tf.count_nonzero(
-                soft_good_end,
-                dtype=tf.float32
-            ) * 100 / tf.cast(tf.size(soft_good_end), dtype=tf.float32)
-        )
-        tf.summary.scalar('soft answer begin or end accuracy',
-            tf.count_nonzero(
-                tf.logical_or(soft_good_begin, soft_good_end),
-                dtype=tf.float32
-            ) * 100 / tf.cast(tf.size(soft_good_end), dtype=tf.float32)
-        )
-        '''
-        tf.summary.scalar('soft answer begin and end accuracy',
-            tf.count_nonzero(
-                tf.logical_and(soft_good_begin, soft_good_end),
-                dtype=tf.float32
-            ) * 100 / tf.cast(tf.size(soft_good_end), dtype=tf.float32)
+            tf.reduce_mean(
+                tf.count_nonzero(
+                    tf.logical_and(good_begin, good_end)
+                )
+            )
         )
         # f1 score
         TP = tf.nn.relu(
@@ -289,8 +271,14 @@ class Model:
             )
         )
         self.summary = tf.summary.merge_all()
-        self.train_writer = tf.summary.FileWriter(LOGS_PATH + SEP + "train", graph=self.graph)
-        self.test_writer = tf.summary.FileWriter(LOGS_PATH + SEP + "test", graph=self.graph)
+        self.train_writer = tf.summary.FileWriter(
+                LOGS_PATH + SEP + "train",
+                graph=self.graph
+        )
+        self.test_writer = tf.summary.FileWriter(
+                LOGS_PATH + SEP + "test",
+                graph=self.graph
+        )
     # __summary_all
 
     def init_variables(self, session):
@@ -307,49 +295,61 @@ class Model:
             train,
             test,
             batch_size=BATCH_SIZE,
-            test_every=None,
+            train_summary_every=None,
+            test_summary_every=None,
             epochs=1
     ):
         step = 0
         for e in range(epochs):
             for batch in tqdm(next_batch(train, batch_size, self.__embeddings)):
-                step += 1
-                summary, _ = session.run(
-                        [
-                            self.summary,
-                            self.train_step
-                        ],
-                        {
-                            self.context: batch[0][0],
-                            self.context_len: batch[0][1],
-                            self.question: batch[1][0],
-                            self.question_len: batch[1][1],
-                            self.true_answer_begin: batch[2][0],
-                            self.true_answer_end: batch[2][1]
-                        }
+                if train_summary_every != None and step % train_summary_every == 0:
+                    summary, _ = session.run(
+                            [
+                                self.summary,
+                                self.train_step
+                            ],
+                            {
+                                self.context: batch[0][0],
+                                self.context_len: batch[0][1],
+                                self.question: batch[1][0],
+                                self.question_len: batch[1][1],
+                                self.true_answer_begin: batch[2][0],
+                                self.true_answer_end: batch[2][1]
+                            }
+                         )
+                    self.train_writer.add_summary(summary, step)
+                else:
+                    session.run(
+                            self.train_step,
+                            {
+                                self.context: batch[0][0],
+                                self.context_len: batch[0][1],
+                                self.question: batch[1][0],
+                                self.question_len: batch[1][1],
+                                self.true_answer_begin: batch[2][0],
+                                self.true_answer_end: batch[2][1]
+                            }
                     )
-                self.train_writer.add_summary(summary, step)
-                if test_every != None and step % test_every == 0:
-                    self.validate(session, test, step, batch_size=BATCH_SIZE)
+                if test_summary_every != None and step % test_summary_every == 0:
+                    self.evaluate(session, test, step, batch_size=BATCH_SIZE)
+                step += 1
     # train_model
 
-    def validate(self, session, test, x, batch_size=BATCH_SIZE):
-        for batch in next_batch(test, batch_size, self.__embeddings):
-            summary = session.run(
-                    self.summary,
-                    {
-                        self.context: batch[0][0],
-                        self.context_len: batch[0][1],
-                        self.question: batch[1][0],
-                        self.question_len: batch[1][1],
-                        self.true_answer_begin: batch[2][0],
-                        self.true_answer_end: batch[2][1]
-                    }
-                )
-            self.test_writer.add_summary(summary, x)
-            print("writed")
-            break
-    # validate
+    def evaluate(self, session, test, x, batch_size=BATCH_SIZE):
+        batch = get_random_batch(test, batch_size, self.__embeddings)
+        summary = session.run(
+            self.summary,
+            {
+                self.context: batch[0][0],
+                self.context_len: batch[0][1],
+                self.question: batch[1][0],
+                self.question_len: batch[1][1],
+                self.true_answer_begin: batch[2][0],
+                self.true_answer_end: batch[2][1]
+            }
+        )
+        self.test_writer.add_summary(summary, x)
+    # evaluate
 
     def save_model(self, session, path=MODEL_PATH):
         self.saver.save(session, path)
