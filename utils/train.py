@@ -4,14 +4,6 @@ from model import *
 
 import tensorflow as tf
 
-'''
-def split_data(data, test_part=0.05):
-    N = data[0][0].shape[0]
-    test_N = int(N * test_part)
-
-# split_data
-'''
-
 def main():
     print("Loading data...")
     train = load_train()
@@ -29,7 +21,7 @@ def main():
             epochs=20,
             batch_size=32,
             train_summary_every=50,
-            test_summary_every=300
+            test_summary_every=200
     )
     m.save_model(sess)
 # main

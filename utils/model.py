@@ -8,7 +8,7 @@ import tensorflow as tf
 BATCH_SIZE = 200
 EPOCHS = 10
 EMBEDDING_SIZE = 300
-RNN_HIDDEN_SIZE = 128
+RNN_HIDDEN_SIZE = 256
 SOFT = 2
 
 def rnn_cell(hidden_size, name):
@@ -33,17 +33,19 @@ def bidirect_cell(
         )
 # bidirect_cell
 
-def group_outputs(outputs, mode=None):
+def group_outputs(outputs, mode=None, bn=False):
     if mode == "concat":
         outputs = tf.concat([outputs[0], outputs[1]], axis=2)
     elif mode == "sum":
         outputs = tf.add(outputs[0], outputs[1])
     else:
         raise
+    if bn:
+        outputs = tf.layers.batch_normalization(outputs)
     return outputs
 # group_outputs
 
-def group_LSTM_state(states, make=False, mode=None):
+def group_LSTM_state(states, make=False, mode=None, bn=False):
     if make and (mode == "concat_all" or mode == "sum_all"):
         raise
     if mode == "concat":
@@ -58,6 +60,8 @@ def group_LSTM_state(states, make=False, mode=None):
         states = tf.add(states[0], states[1])
     else:
         raise
+    if bn:
+        states = tf.layers.batch_normalization(states)
     if make:
         return tf.contrib.rnn.LSTMStateTuple(states[0], states[1])
     return states
@@ -112,13 +116,14 @@ class Model:
                 context_out = self.__setup_context(
                         question_out
                 )
-            self.__setup_loss_and_answers(batch_size,
+            self.__setup_loss_and_answers(
+                    batch_size,
                     question_out,
                     context_out
             )
             self.__summary_all()
 
-            optimizer = tf.train.RMSPropOptimizer(0.001)
+            optimizer = tf.train.RMSPropOptimizer(0.0001)
             gradients, variables = zip(*optimizer.compute_gradients(self.loss))
             gradients, _ = tf.clip_by_global_norm(gradients, 1000)
             self.train_step = optimizer.apply_gradients(zip(gradients, variables))
@@ -165,41 +170,73 @@ class Model:
                 self.question_len,
                 name="q_rnn1",
                 hidden_size=RNN_HIDDEN_SIZE
-            )
-        # TODO BN
+        )
+        output1 = group_outputs(
+                question_layer1[0],
+                mode="concat",
+                bn=False
+        )
+        '''
+        stat1 = group_LSTM_state(
+                question_layer1[1],
+                make=True,
+                mode="sum",
+                bn=False
+        )
+        '''
         question_layer2 = bidirect_cell(
-                group_outputs(question_layer1[0], mode="concat"),
+                output1,
                 self.question_len,
                 name="q_rnn2",
                 hidden_size=RNN_HIDDEN_SIZE,
-                initial_state=group_LSTM_state(question_layer1[1], make=True, mode="sum")
-            )
+        #        initial_state=stat1
+        )
         return question_layer2
     # __setup_question
 
     def __setup_context(self, question_out):
+        question_state = group_LSTM_state(
+                question_out[1],
+                make=False,
+                mode="concat",
+                bn=True
+        )
+        question_state = tf.layers.dense(
+                question_state,
+                units=RNN_HIDDEN_SIZE
+        )
+        start_state = tf.contrib.rnn.LSTMStateTuple(
+                question_state[0],
+                question_state[1]
+        )
         context_layer1 = bidirect_cell(
                 self.context,
                 self.context_len,
                 name="c_rnn1",
                 hidden_size=RNN_HIDDEN_SIZE
-            )
+        )
         context_layer2 = bidirect_cell(
-                group_outputs(context_layer1[0], mode="concat"),
+                group_outputs(context_layer1[0], mode="concat", bn=True),
                 self.context_len,
                 name="c_rnn2",
                 hidden_size=RNN_HIDDEN_SIZE,
-                initial_state=group_LSTM_state(context_layer1[1], make=True, mode="sum")
-            )
-        # TODO BN
-        return context_layer2
+                initial_state=start_state
+        )
+        context_layer3 = bidirect_cell(
+                group_outputs(context_layer2[0], mode="concat", bn=True),
+                self.context_len,
+                name="c_rnn3",
+                hidden_size=RNN_HIDDEN_SIZE,
+                initial_state=start_state
+        )
+        return context_layer3
     # __setup_context()
 
     def __setup_loss_and_answers(self, batch_size,
             question_out,
             context_out
     ):
-        context_outputs = group_outputs(context_out[0], mode="concat")
+        context_outputs = group_outputs(context_out[0], mode="concat", bn=True)
         dense_begin = tf.layers.dense(
                 inputs=context_outputs,
                 units=RNN_HIDDEN_SIZE,
@@ -214,7 +251,7 @@ class Model:
         )
         question_state = group_LSTM_state(
                 question_out[1],
-                mode="sum_all"
+                mode="concat_all"
         )
         question_state = tf.reshape(
                 question_state,
@@ -242,8 +279,8 @@ class Model:
                 logits=points_end,
                 name="softmax_end"
         )
-        loss_end = tf.reduce_mean(softmax_end, name='loss_end')
         loss_begin = tf.reduce_mean(softmax_begin, name='loss_begin')
+        loss_end = tf.reduce_mean(softmax_end, name='loss_end')
         self.loss = tf.add(loss_begin, loss_end, name='loss')
         self.answer_begin = tf.argmax(
                 points_begin,
@@ -264,9 +301,10 @@ class Model:
         good_begin = tf.equal(self.true_answer_begin, self.answer_begin)
         good_end = tf.equal(self.true_answer_end, self.answer_end)
         tf.summary.scalar('answer begin accuracy',
-            tf.reduce_mean(
-                tf.cast(good_begin, tf.int32)
-            )
+            tf.count_nonzero(
+                good_begin,
+                dtype=tf.float32
+            ) / tf.cast(tf.size(good_begin), tf.float32)
         )
         '''
         tf.summary.scalar('answer end accuracy',
@@ -283,9 +321,10 @@ class Model:
         )
         '''
         tf.summary.scalar('answer begin and end accuracy',
-            tf.reduce_mean(
-                tf.cast(tf.logical_and(good_begin, good_end), tf.int32)
-            )
+            tf.count_nonzero(
+                tf.logical_and(good_begin, good_end),
+                dtype=tf.float32
+            ) / tf.cast(tf.size(good_begin), tf.float32)
         )
         # f1 score
         TP = tf.nn.relu(
