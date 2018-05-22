@@ -120,16 +120,17 @@ class Model:
                         question_out,
                         question_features
                 )
-            self.__setup_loss_and_answers(
-                    question_out,
-                    question_features,
-                    context_out
-            )
+            with tf.variable_scope("loss_and_prediction"):
+                self.__setup_loss_and_answers(
+                        question_out,
+                        question_features,
+                        context_out
+                )
             self.__summary_all()
 
             optimizer = tf.train.RMSPropOptimizer(0.001)
             gradients, variables = zip(*optimizer.compute_gradients(self.loss))
-            gradients, _ = tf.clip_by_global_norm(gradients, 1000)
+            #gradients, _ = tf.clip_by_global_norm(gradients, 1000)
             self.train_step = optimizer.apply_gradients(zip(gradients, variables))
             self.init = tf.global_variables_initializer()
             self.saver = tf.train.Saver()
@@ -226,7 +227,8 @@ class Model:
         question_attention = question_attention / for_divide[:,tf.newaxis]
         question_features = tf.reduce_sum(
                 question_outputs * question_attention[:,:,tf.newaxis],
-                axis=1
+                axis=1,
+                name='question_features'
         )
         print(question_features)
         return question_features
@@ -313,12 +315,6 @@ class Model:
                 question_features,
                 name='points_end'
         )
-        context_mask = tf.sequence_mask(
-                self.context_len,
-                maxlen=self.__context_size,
-                name='context_mask',
-                dtype=tf.float32
-        )
         points_begin = tf.reshape(
                 points_begin,
                 (
@@ -333,10 +329,18 @@ class Model:
                     self.__context_size
                 )
         )
-        softmax_begin = tf.nn.softmax(points_begin) * context_mask
-        softmax_end = tf.nn.softmax(points_end) * context_mask
+        self.context_mask = tf.sequence_mask(
+                self.context_len,
+                maxlen=self.__context_size,
+                name='context_mask',
+                dtype=tf.float32
+        )
+        softmax_begin = tf.nn.softmax(points_begin) #* self.context_mask
+        softmax_end = tf.nn.softmax(points_end) #* self.context_mask
+        '''
         softmax_begin /= tf.reduce_sum(softmax_begin, axis=1)[:,tf.newaxis]
         softmax_end /= tf.reduce_sum(softmax_end, axis=1)[:,tf.newaxis]
+        '''
         loss_begin = tf.nn.sparse_softmax_cross_entropy_with_logits(
                 labels=self.true_answer_begin,
                 logits=softmax_begin,
@@ -365,30 +369,30 @@ class Model:
     # __setup_loss_and_answers
 
     def __summary_all(self):
-        tf.summary.scalar('loss', self.loss)
+        tf.summary.scalar('Loss', self.loss)
         good_begin = tf.equal(self.true_answer_begin, self.answer_begin)
         good_end = tf.equal(self.true_answer_end, self.answer_end)
-        tf.summary.scalar('answer begin accuracy',
+        tf.summary.scalar('Answer begin accuracy',
             tf.count_nonzero(
                 good_begin,
                 dtype=tf.float32
             ) / tf.cast(tf.size(good_begin), tf.float32)
         )
         '''
-        tf.summary.scalar('answer end accuracy',
+        tf.summary.scalar('Answer end accuracy',
             tf.count_nonzero(
                 good_end,
                 dtype=tf.float32
             ) * 100 / tf.cast(tf.size(good_end), dtype=tf.float32)
         )
-        tf.summary.scalar('answer begin or end accuracy',
+        tf.summary.scalar('Answer begin or end accuracy',
             tf.count_nonzero(
                 tf.logical_or(good_begin, good_end),
                 dtype=tf.float32
             ) * 100 / tf.cast(tf.size(good_end), dtype=tf.float32)
         )
         '''
-        tf.summary.scalar('answer begin and end accuracy',
+        tf.summary.scalar('Answer begin and end accuracy',
                 tf.count_nonzero(
                     tf.logical_and(good_begin, good_end),
                     dtype=tf.float32
