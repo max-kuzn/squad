@@ -107,17 +107,22 @@ class Model:
         with self.graph.as_default():
             with tf.variable_scope("input"):
                 self.__setup_inputs()
-            batch_size = tf.shape(self.question)[0]
-            question_size = tf.shape(self.question)[1]
-            context_size = tf.shape(self.context)[1]
+            self.__batch_size = tf.shape(self.question)[0]
+            self.__question_size = tf.shape(self.question)[1]
+            self.__context_size = tf.shape(self.context)[1]
             with tf.variable_scope("question"):
                 question_out = self.__setup_question()
-            with tf.variable_scope("context"):
-                context_out = self.__setup_context(
+                question_features = self.__setup_question_features(
                         question_out
                 )
-            self.__setup_loss_and_answers(batch_size,
+            with tf.variable_scope("context"):
+                context_out = self.__setup_context(
+                        question_out,
+                        question_features
+                )
+            self.__setup_loss_and_answers(
                     question_out,
+                    question_features,
                     context_out
             )
             self.__summary_all()
@@ -191,7 +196,43 @@ class Model:
         return question_layer2
     # __setup_question
 
-    def __setup_context(self, question_out):
+    def __setup_question_features(self, question_out):
+        question_outputs = group_outputs(
+                question_out[0],
+                mode='concat'
+        )
+        question_attention = tf.layers.dense(
+                inputs=question_outputs,
+                units=1,
+                use_bias=True,
+                name='question_attention'
+        )
+        question_attention = tf.reshape(question_attention, (self.__batch_size, self.__question_size))
+        print(self.question_len)
+        print(tf.shape(self.question_len))
+        print(question_attention)
+        question_mask = tf.sequence_mask(
+                self.question_len,
+                maxlen=self.__question_size,
+                name='question_attention_mask',
+                dtype=tf.float32
+        )
+        question_attention = tf.nn.softmax(question_attention) * question_mask
+        for_divide = tf.reduce_sum(
+                question_attention,
+                axis=1
+        )
+        print(for_divide)
+        question_attention = question_attention / for_divide[:,tf.newaxis]
+        question_features = tf.reduce_sum(
+                question_outputs * question_attention[:,:,tf.newaxis],
+                axis=1
+        )
+        print(question_features)
+        return question_features
+    # __setup_question_features
+
+    def __setup_context(self, question_out, question_features):
         question_state = group_LSTM_state(
                 question_out[1],
                 make=False,
@@ -219,33 +260,28 @@ class Model:
                 hidden_size=RNN_HIDDEN_SIZE,
                 initial_state=start_state
         )
-        context_layer3 = bidirect_cell(
-                group_outputs(context_layer2[0], mode="concat", bn=True),
-                self.context_len,
-                name="c_rnn3",
-                hidden_size=RNN_HIDDEN_SIZE,
-                initial_state=start_state
-        )
-        return context_layer3
+        return context_layer2
     # __setup_context()
 
-    def __setup_loss_and_answers(self, batch_size,
+    def __setup_loss_and_answers(self,
             question_out,
+            question_features,
             context_out
     ):
         context_outputs = group_outputs(context_out[0], mode="concat", bn=False)
         dense_begin = tf.layers.dense(
                 inputs=context_outputs,
-                units=4*RNN_HIDDEN_SIZE,
+                units=2*RNN_HIDDEN_SIZE,
                 use_bias=True,
                 name='dense_begin'
         )
         dense_end = tf.layers.dense(
                 inputs=context_outputs,
-                units=4*RNN_HIDDEN_SIZE,
+                units=2*RNN_HIDDEN_SIZE,
                 use_bias=True,
                 name='dense_end'
         )
+        '''
         question_state = group_LSTM_state(
                 question_out[1],
                 mode="concat_all"
@@ -258,43 +294,70 @@ class Model:
                     1
                 )
         )
+        '''
+        question_features = tf.reshape(
+                question_features,
+                (
+                    self.__batch_size,
+                    2*RNN_HIDDEN_SIZE,
+                    1
+                )
+        )
         points_begin = tf.matmul(
                 dense_begin,
-                question_state,
+                question_features,
                 name='points_begin'
         )
         points_end = tf.matmul(
                 dense_end,
-                question_state,
+                question_features,
                 name='points_end'
+        )
+        context_mask = tf.sequence_mask(
+                self.context_len,
+                maxlen=self.__context_size,
+                name='context_mask',
+                dtype=tf.float32
         )
         points_begin = tf.reshape(
                 points_begin,
-                tf.shape(points_begin)[:-1]
+                (
+                    self.__batch_size,
+                    self.__context_size
+                )
         )
-        points_end = tf.reshape(points_end, tf.shape(points_end)[:-1])
-        softmax_begin = tf.nn.sparse_softmax_cross_entropy_with_logits(
+        points_end = tf.reshape(
+                points_end,
+                (
+                    self.__batch_size,
+                    self.__context_size
+                )
+        )
+        softmax_begin = tf.nn.softmax(points_begin) * context_mask
+        softmax_end = tf.nn.softmax(points_end) * context_mask
+        softmax_begin /= tf.reduce_sum(softmax_begin, axis=1)[:,tf.newaxis]
+        softmax_end /= tf.reduce_sum(softmax_end, axis=1)[:,tf.newaxis]
+        loss_begin = tf.nn.sparse_softmax_cross_entropy_with_logits(
                 labels=self.true_answer_begin,
-                logits=points_begin,
+                logits=softmax_begin,
                 name="softmax_begin"
         )
-        softmax_end = tf.nn.sparse_softmax_cross_entropy_with_logits(
+        loss_end = tf.nn.sparse_softmax_cross_entropy_with_logits(
                 labels=self.true_answer_end,
-                logits=points_end,
+                logits=softmax_end,
                 name="softmax_end"
         )
-        loss_begin = tf.reduce_mean(softmax_begin, name='loss_begin')
-        loss_end = tf.reduce_mean(softmax_end, name='loss_end')
-        #self.loss = tf.add(loss_begin, loss_end, name='loss')
-        self.loss = loss_begin
+        batch_loss_begin = tf.reduce_mean(loss_begin, name='loss_begin')
+        batch_loss_end = tf.reduce_mean(loss_end, name='loss_end')
+        self.loss = tf.add(batch_loss_begin, batch_loss_end, name='loss')
         self.answer_begin = tf.argmax(
-                points_begin,
+                softmax_begin,
                 name='answer_begin',
                 axis=-1,
                 output_type=tf.int32
         )
         self.answer_end = tf.argmax(
-                points_end,
+                softmax_end,
                 name='answer_end',
                 axis=-1,
                 output_type=tf.int32
@@ -326,10 +389,10 @@ class Model:
         )
         '''
         tf.summary.scalar('answer begin and end accuracy',
-            tf.count_nonzero(
-                tf.logical_and(good_begin, good_end),
-                dtype=tf.float32
-            ) / tf.cast(tf.size(good_begin), tf.float32)
+                tf.count_nonzero(
+                    tf.logical_and(good_begin, good_end),
+                    dtype=tf.float32
+                ) / tf.cast(tf.size(good_begin), tf.float32)
         )
         # f1 score
         TP = tf.nn.relu(
