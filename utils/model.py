@@ -116,14 +116,13 @@ class Model:
                 context_out = self.__setup_context(
                         question_out
                 )
-            self.__setup_loss_and_answers(
-                    batch_size,
+            self.__setup_loss_and_answers(batch_size,
                     question_out,
                     context_out
             )
             self.__summary_all()
 
-            optimizer = tf.train.RMSPropOptimizer(0.0001)
+            optimizer = tf.train.RMSPropOptimizer(0.001)
             gradients, variables = zip(*optimizer.compute_gradients(self.loss))
             gradients, _ = tf.clip_by_global_norm(gradients, 1000)
             self.train_step = optimizer.apply_gradients(zip(gradients, variables))
@@ -170,26 +169,24 @@ class Model:
                 self.question_len,
                 name="q_rnn1",
                 hidden_size=RNN_HIDDEN_SIZE
-        )
+            )
         output1 = group_outputs(
                 question_layer1[0],
                 mode="concat",
                 bn=False
         )
-        '''
         stat1 = group_LSTM_state(
                 question_layer1[1],
                 make=True,
                 mode="sum",
                 bn=False
         )
-        '''
         question_layer2 = bidirect_cell(
                 output1,
                 self.question_len,
                 name="q_rnn2",
                 hidden_size=RNN_HIDDEN_SIZE,
-        #        initial_state=stat1
+                initial_state=stat1
         )
         return question_layer2
     # __setup_question
@@ -236,16 +233,16 @@ class Model:
             question_out,
             context_out
     ):
-        context_outputs = group_outputs(context_out[0], mode="concat", bn=True)
+        context_outputs = group_outputs(context_out[0], mode="concat", bn=False)
         dense_begin = tf.layers.dense(
                 inputs=context_outputs,
-                units=RNN_HIDDEN_SIZE,
+                units=4*RNN_HIDDEN_SIZE,
                 use_bias=True,
                 name='dense_begin'
         )
         dense_end = tf.layers.dense(
                 inputs=context_outputs,
-                units=RNN_HIDDEN_SIZE,
+                units=4*RNN_HIDDEN_SIZE,
                 use_bias=True,
                 name='dense_end'
         )
@@ -255,7 +252,11 @@ class Model:
         )
         question_state = tf.reshape(
                 question_state,
-                (tf.shape(question_state)[0], tf.shape(question_state)[1], 1)
+                (
+                    tf.shape(question_state)[0],
+                    tf.shape(question_state)[1],
+                    1
+                )
         )
         points_begin = tf.matmul(
                 dense_begin,
@@ -267,7 +268,10 @@ class Model:
                 question_state,
                 name='points_end'
         )
-        points_begin = tf.reshape(points_begin, tf.shape(points_begin)[:-1])
+        points_begin = tf.reshape(
+                points_begin,
+                tf.shape(points_begin)[:-1]
+        )
         points_end = tf.reshape(points_end, tf.shape(points_end)[:-1])
         softmax_begin = tf.nn.sparse_softmax_cross_entropy_with_logits(
                 labels=self.true_answer_begin,
@@ -281,7 +285,8 @@ class Model:
         )
         loss_begin = tf.reduce_mean(softmax_begin, name='loss_begin')
         loss_end = tf.reduce_mean(softmax_end, name='loss_end')
-        self.loss = tf.add(loss_begin, loss_end, name='loss')
+        #self.loss = tf.add(loss_begin, loss_end, name='loss')
+        self.loss = loss_begin
         self.answer_begin = tf.argmax(
                 points_begin,
                 name='answer_begin',

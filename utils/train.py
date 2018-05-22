@@ -18,7 +18,7 @@ def main():
             sess,
             train,
             test,
-            epochs=20,
+            epochs=30,
             batch_size=32,
             train_summary_every=50,
             test_summary_every=200
