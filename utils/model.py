@@ -120,17 +120,22 @@ class Model:
                         question_out,
                         question_features
                 )
-            with tf.variable_scope("loss_and_prediction"):
-                self.__setup_loss_and_answers(
+            with tf.variable_scope("loss"):
+                points = self.__setup_loss(
                         question_out,
                         question_features,
                         context_out
+                )
+            with tf.variable_scope("answer"):
+                self.__setup_answer(
+                        points[0],
+                        points[1]
                 )
             self.__summary_all()
 
             optimizer = tf.train.RMSPropOptimizer(0.001)
             gradients, variables = zip(*optimizer.compute_gradients(self.loss))
-            #gradients, _ = tf.clip_by_global_norm(gradients, 1000)
+            gradients, _ = tf.clip_by_global_norm(gradients, 1000)
             self.train_step = optimizer.apply_gradients(zip(gradients, variables))
             self.init = tf.global_variables_initializer()
             self.saver = tf.train.Saver()
@@ -166,6 +171,16 @@ class Model:
             tf.int32,
             name="true_answer_end",
             shape=(None)
+        )
+        self.answer_begin = tf.placeholder(
+                tf.int32,
+                name="answer_begin",
+                shape=(None)
+        )
+        self.answer_end = tf.placeholder(
+                tf.int32,
+                name="answer_end",
+                shape=(None)
         )
     # __setup_inputs
 
@@ -209,9 +224,6 @@ class Model:
                 name='question_attention'
         )
         question_attention = tf.reshape(question_attention, (self.__batch_size, self.__question_size))
-        print(self.question_len)
-        print(tf.shape(self.question_len))
-        print(question_attention)
         question_mask = tf.sequence_mask(
                 self.question_len,
                 maxlen=self.__question_size,
@@ -230,7 +242,6 @@ class Model:
                 axis=1,
                 name='question_features'
         )
-        print(question_features)
         return question_features
     # __setup_question_features
 
@@ -265,7 +276,7 @@ class Model:
         return context_layer2
     # __setup_context()
 
-    def __setup_loss_and_answers(self,
+    def __setup_loss(self,
             question_out,
             question_features,
             context_out
@@ -329,44 +340,32 @@ class Model:
                     self.__context_size
                 )
         )
-        self.context_mask = tf.sequence_mask(
-                self.context_len,
-                maxlen=self.__context_size,
-                name='context_mask',
-                dtype=tf.float32
-        )
-        softmax_begin = tf.nn.softmax(points_begin) #* self.context_mask
-        softmax_end = tf.nn.softmax(points_end) #* self.context_mask
-        '''
-        softmax_begin /= tf.reduce_sum(softmax_begin, axis=1)[:,tf.newaxis]
-        softmax_end /= tf.reduce_sum(softmax_end, axis=1)[:,tf.newaxis]
-        '''
         loss_begin = tf.nn.sparse_softmax_cross_entropy_with_logits(
                 labels=self.true_answer_begin,
-                logits=softmax_begin,
+                logits=points_begin,
                 name="softmax_begin"
         )
         loss_end = tf.nn.sparse_softmax_cross_entropy_with_logits(
                 labels=self.true_answer_end,
-                logits=softmax_end,
+                logits=points_end,
                 name="softmax_end"
         )
         batch_loss_begin = tf.reduce_mean(loss_begin, name='loss_begin')
         batch_loss_end = tf.reduce_mean(loss_end, name='loss_end')
         self.loss = tf.add(batch_loss_begin, batch_loss_end, name='loss')
-        self.answer_begin = tf.argmax(
-                softmax_begin,
-                name='answer_begin',
-                axis=-1,
-                output_type=tf.int32
-        )
-        self.answer_end = tf.argmax(
-                softmax_end,
-                name='answer_end',
-                axis=-1,
-                output_type=tf.int32
-        )
+        return points_begin, points_end
     # __setup_loss_and_answers
+
+    def __setup_answer(self, points_begin, points_end):
+        context_mask = tf.sequence_mask(
+                self.context_len,
+                maxlen=self.__context_size,
+                name='context_mask',
+                dtype=tf.float32
+        )
+        self.exp_begin = tf.exp(points_begin) * context_mask
+        self.exp_end = tf.exp(points_end) * context_mask
+    # __setup_answers
 
     def __summary_all(self):
         tf.summary.scalar('Loss', self.loss)
@@ -448,15 +447,17 @@ class Model:
             batch_size=BATCH_SIZE,
             train_summary_every=None,
             test_summary_every=None,
+            window=15,
             epochs=1
     ):
         step = 0
         for e in range(epochs):
             for batch in tqdm(next_batch(train, batch_size, self.__embeddings)):
                 if train_summary_every != None and step % train_summary_every == 0:
-                    summary, _ = session.run(
+                    exp_begin, exp_end, _ = session.run(
                             [
-                                self.summary,
+                                self.exp_begin,
+                                self.exp_end,
                                 self.train_step
                             ],
                             {
@@ -465,10 +466,31 @@ class Model:
                                 self.question: batch[1][0],
                                 self.question_len: batch[1][1],
                                 self.true_answer_begin: batch[2][0],
-                                self.true_answer_end: batch[2][1]
+                                self.true_answer_end: batch[2][1],
+                                self.answer_begin: batch[2][0],
+                                self.answer_end: batch[2][1]
                             }
                          )
+                    answer_begin, answer_end = find_answer(
+                            exp_begin,
+                            exp_end,
+                            window
+                    )
+                    summary = session.run(
+                            self.summary,
+                            {
+                                self.answer_begin: answer_begin,
+                                self.answer_end: answer_end,
+                                self.context: batch[0][0],
+                                self.context_len: batch[0][1],
+                                self.question: batch[1][0],
+                                self.question_len: batch[1][1],
+                                self.true_answer_begin: batch[2][0],
+                                self.true_answer_end: batch[2][1]
+                            }
+                    )
                     self.train_writer.add_summary(summary, step)
+
                 else:
                     session.run(
                             self.train_step,

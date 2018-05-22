@@ -157,3 +157,20 @@ def next_batch(data, batch_size, embedding):
         yield get_batch(data, l, r, embedding)
 # next_batch
 
+def find_answer(exp_begin, exp_end, window):
+    batch_size = exp_begin.shape[0]
+    size = exp_begin.shape[1]
+    answer_begin = np.empty((batch_size,), dtype=np.int32)
+    answer_end = np.empty((batch_size,), dtype=np.int32)
+    for i in range(batch_size):
+        max_point = 0
+        for b in range(size - 1):
+            for e in range(b + 1, min(b + window + 1, size)):
+                point = exp_begin[i, b] * exp_end[i, e]
+                if point > max_point:
+                    max_point = point
+                    answer_begin[i] = b
+                    answer_end[i] = e
+    return answer_begin, answer_end
+# find_answer
+
