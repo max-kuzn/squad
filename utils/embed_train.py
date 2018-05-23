@@ -24,6 +24,19 @@ def embed_paragraph(par, w2i):
     for qa in par['qas']:
         emb_par['qas'].append(embed_qa(qa, w2i))
     return emb_par
+# embed_paragraph
+
+def embed_data(data, w2i):
+    emb_train = dict()
+    emb_train['paragraphs'] = list()
+    for par in tqdm(data[0]['paragraphs']):
+        emb_train['paragraph'].append(embed_paragraph(par, w2i))
+    emb_test = dict()
+    emb_test['paragraphs'] = list()
+    for par in tqdm(data[1]['paragraphs']):
+        emb_test['paragraph'].append(embed_paragraph(par, w2i))
+    return emb_train, emb_test
+# embed_data
 
 def main():
     i2w = np.load(INDEX2WORD_PATH)
