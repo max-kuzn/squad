@@ -18,10 +18,11 @@ def main():
             sess,
             train,
             test,
-            epochs=30,
+            epochs=20,
             batch_size=32,
-            train_summary_every=5,
-            test_summary_every=10
+            keep_prob=0.7,
+            train_summary_every=50,
+            test_summary_every=200
     )
     m.save_model(sess)
 # main
