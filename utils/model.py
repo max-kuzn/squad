@@ -6,10 +6,8 @@ import numpy as np
 import tensorflow as tf
 
 BATCH_SIZE = 32
-EPOCHS = 10
 EMBEDDING_SIZE = 300
-RNN_HIDDEN_SIZE = 128
-SOFT = 2
+RNN_HIDDEN_SIZE = 100
 FEATURES_SIZE = 2
 PARTS_NUM = 44
 
@@ -55,7 +53,7 @@ def bidirect_cell(
         )
 # bidirect_cell
 
-def group_outputs(outputs, mode=None, bn=False):
+def group_outputs(outputs, mode=None, bn=False, is_training=False):
     if mode == "concat":
         outputs = tf.concat([outputs[0], outputs[1]], axis=2)
     elif mode == "sum":
@@ -63,11 +61,14 @@ def group_outputs(outputs, mode=None, bn=False):
     else:
         raise
     if bn:
-        outputs = tf.layers.batch_normalization(outputs)
+        outputs = tf.layers.batch_normalization(
+                outputs,
+                training=is_training
+        )
     return outputs
 # group_outputs
 
-def group_LSTM_state(states, make=False, mode=None, bn=False):
+def group_LSTM_state(states, make=False, mode=None, bn=False, is_training=False):
     if make and (mode == "concat_all" or mode == "sum_all"):
         raise
     if mode == "concat":
@@ -83,7 +84,10 @@ def group_LSTM_state(states, make=False, mode=None, bn=False):
     else:
         raise
     if bn:
-        states = tf.layers.batch_normalization(states)
+        states = tf.layers.batch_normalization(
+                states,
+                training=is_training
+        )
     if make:
         return tf.contrib.rnn.LSTMStateTuple(states[0], states[1])
     return states
@@ -95,12 +99,10 @@ class Model:
             mode="train", # "train", "test" or "both"
             logs=True,
             batch_size=BATCH_SIZE,
-            epochs=EPOCHS,
             embedding_size=EMBEDDING_SIZE
     ):
         self.__setup_constants(
                 bs=batch_size,
-                e=epochs,
                 es=embedding_size
         )
         self.__logs = logs
@@ -109,9 +111,8 @@ class Model:
         self.__setup_model()
     # __init__
 
-    def __setup_constants(self, bs, e, es):
+    def __setup_constants(self, bs, es):
         self.__BATCH_SIZE = bs
-        self.__EPOCHS = e
         self.__EMBEDDING_SIZE = es
     # __setup_constants
 
@@ -134,7 +135,10 @@ class Model:
             self.__context_size = tf.shape(self.context)[1]
             self.__context_with_features = tf.concat(
                     [
-                        self.context,
+                        tf.nn.dropout(
+                            self.context,
+                            self.keep_prob
+                        ),
                         tf.cast(
                             self.context_features[:, :, 1],
                             tf.float32
@@ -172,7 +176,7 @@ class Model:
 
             optimizer = tf.train.RMSPropOptimizer(0.001)
             gradients, variables = zip(*optimizer.compute_gradients(self.loss))
-            gradients, _ = tf.clip_by_global_norm(gradients, 1000)
+            # gradients, _ = tf.clip_by_global_norm(gradients, 1000)
             self.train_step = optimizer.apply_gradients(zip(gradients, variables))
             self.init = tf.global_variables_initializer()
             self.saver = tf.train.Saver()
@@ -217,32 +221,42 @@ class Model:
         self.answer_mask = tf.placeholder(
             tf.float32,
             name="answer_mask",
-            shape=(None, None, None)
+            shape=(None, None)
         )
         self.keep_prob = tf.placeholder(
             tf.float32,
             name="keep_prob"
         )
+        self.is_training = tf.placeholder(
+            tf.bool,
+            name="is_training"
+        )
     # __setup_inputs
 
     def __setup_question(self):
         question_layer1 = bidirect_cell(
-                self.question,
+                tf.nn.dropout(
+                    self.question,
+                    self.keep_prob
+                ),
                 self.question_len,
                 name="q_rnn1",
                 hidden_size=RNN_HIDDEN_SIZE,
+                keep_state=self.keep_prob,
                 keep_in=self.keep_prob
             )
         output1 = group_outputs(
                 question_layer1[0],
                 mode="concat",
-                bn=False
+                bn=True,
+                is_training=self.is_training
         )
         question_layer2 = bidirect_cell(
                 output1,
                 self.question_len,
                 name="q_rnn2",
                 hidden_size=RNN_HIDDEN_SIZE,
+                keep_state=self.keep_prob,
                 keep_in=self.keep_prob
         )
         return question_layer2
@@ -252,7 +266,8 @@ class Model:
         question_outputs = group_outputs(
                 question_out[0],
                 mode='concat',
-                bn=True
+                bn=True,
+                is_training=self.is_training
         )
         question_attention = tf.layers.dense(
                 inputs=question_outputs,
@@ -285,33 +300,25 @@ class Model:
     # __setup_question_features
 
     def __setup_context(self, question_out, question_features):
-        '''
-        question_state = group_LSTM_state(
-                question_out[1],
-                make=False,
-                mode="concat",
-                bn=True
-        )
-        question_state = tf.layers.dense(
-                question_state,
-                units=RNN_HIDDEN_SIZE
-        )
-        start_state = tf.contrib.rnn.LSTMStateTuple(
-                question_state[0],
-                question_state[1]
-        )'''
         context_layer1 = bidirect_cell(
                 self.__context_with_features,
                 self.context_len,
                 name="c_rnn1",
                 hidden_size=RNN_HIDDEN_SIZE,
+                keep_state=self.keep_prob,
                 keep_in=self.keep_prob
         )
         context_layer2 = bidirect_cell(
-                group_outputs(context_layer1[0], mode="concat"),
+                group_outputs(
+                    context_layer1[0],
+                    mode="concat",
+                    bn=True,
+                    is_training=self.is_training
+                ),
                 self.context_len,
                 name="c_rnn2",
                 hidden_size=RNN_HIDDEN_SIZE,
+                keep_state=self.keep_prob,
                 keep_in=self.keep_prob
         )
         return context_layer2
@@ -322,7 +329,12 @@ class Model:
             question_features,
             context_out
     ):
-        context_outputs = group_outputs(context_out[0], mode="concat", bn=True)
+        context_outputs = group_outputs(
+                context_out[0],
+                mode="concat",
+                bn=True,
+                is_training=self.is_training
+        )
         dense_begin = tf.layers.dense(
                 inputs=context_outputs,
                 units=2*RNN_HIDDEN_SIZE,
@@ -335,20 +347,6 @@ class Model:
                 use_bias=True,
                 name='dense_end'
         )
-        '''
-        question_state = group_LSTM_state(
-                question_out[1],
-                mode="concat_all"
-        )
-        question_state = tf.reshape(
-                question_state,
-                (
-                    tf.shape(question_state)[0],
-                    tf.shape(question_state)[1],
-                    1
-                )
-        )
-        '''
         question_features = tf.reshape(
                 question_features,
                 (
@@ -404,21 +402,21 @@ class Model:
                 name='context_mask',
                 dtype=tf.float32
         )
-        exp_begin = tf.exp(points_begin) * context_mask
-        exp_end = tf.exp(points_end) * context_mask
+        softmax_begin = tf.nn.softmax(points_begin) * context_mask
+        softmax_end = tf.nn.softmax(points_end) * context_mask
         matrix_answers = tf.matmul(
                 tf.reshape(
-                    exp_begin,
+                    softmax_begin,
                     (self.__batch_size, self.__context_size, 1)
                 ),
                 tf.reshape(
-                    exp_end,
+                    softmax_end,
                     (self.__batch_size, 1, self.__context_size)
                 )
         )
         matrix_answers = tf.multiply(
                 matrix_answers,
-                self.answer_mask
+                self.answer_mask[tf.newaxis,:,:]
         )
         answer = tf.argmax(
                 tf.reshape(
@@ -428,7 +426,7 @@ class Model:
                         self.__context_size * self.__context_size
                     )
                 ),
-                axis = -1,
+                axis=-1,
                 output_type=tf.int32
         )
         self.answer_begin = tf.cast(
@@ -526,6 +524,10 @@ class Model:
             epochs=1
     ):
         step = 0
+        mask = get_answer_mask(
+                train[0][0].shape[1],
+                window
+        )
         for e in range(epochs):
             for batch in tqdm(
                     next_batch(
@@ -534,11 +536,6 @@ class Model:
                         self.__embeddings
                     )
             ):
-                mask = get_answer_mask(
-                        batch[0][0].shape[0],
-                        batch[0][0].shape[1],
-                        window
-                )
                 if train_summary_every != None and step % train_summary_every == 0:
                     summary, _ = session.run(
                             [
@@ -554,7 +551,8 @@ class Model:
                                 self.true_answer_begin: batch[2][0],
                                 self.true_answer_end: batch[2][1],
                                 self.answer_mask: mask,
-                                self.keep_prob: keep_prob
+                                self.keep_prob: keep_prob,
+                                self.is_training: True
                             }
                          )
                     self.train_writer.add_summary(summary, step)
@@ -570,7 +568,8 @@ class Model:
                                 self.true_answer_begin: batch[2][0],
                                 self.true_answer_end: batch[2][1],
                                 self.answer_mask: mask,
-                                self.keep_prob: keep_prob
+                                self.keep_prob: keep_prob,
+                                self.is_training: True
                             }
                     )
                 if test_summary_every != None and step % test_summary_every == 0:
@@ -587,7 +586,7 @@ class Model:
 
     def evaluate(self, session, test, window, x, keep_prob=1.0, batch_size=BATCH_SIZE):
         batch = get_random_batch(test, batch_size, self.__embeddings)
-        mask = get_answer_mask(batch_size, test[0][0].shape[1], window)
+        mask = get_answer_mask(test[0][0].shape[1], window)
         summary = session.run(
             self.summary,
             {
@@ -599,7 +598,8 @@ class Model:
                 self.true_answer_begin: batch[2][0],
                 self.true_answer_end: batch[2][1],
                 self.answer_mask: mask,
-                self.keep_prob: keep_prob
+                self.keep_prob: keep_prob,
+                self.is_training: False
             }
         )
         self.test_writer.add_summary(summary, x)

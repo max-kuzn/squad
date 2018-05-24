@@ -160,11 +160,11 @@ def next_batch(data, batch_size, embedding):
         yield get_batch(data, l, r, embedding)
 # next_batch
 
-def get_answer_mask(batch_size, max_len, window):
-    mask = np.zeros((batch_size, max_len, max_len), dtype=np.float32)
+def get_answer_mask(max_len, window):
+    mask = np.zeros((max_len, max_len), dtype=np.float32)
     for i in range(max_len):
         for j in range(i + 1, min(i + window + 1, max_len)):
-            mask[:, i, j] = 1
+            mask[i, j] = 1
     return mask
 # get_answer_mask
 

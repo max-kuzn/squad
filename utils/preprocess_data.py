@@ -100,12 +100,12 @@ def init_comfort_data(data):
                 max_question_len = len(q['question'])
     MAX_CONTEXT_LEN = max_context_len
     context = np.zeros((n, max_context_len), dtype=np.int32)
-    context_len = np.empty((n,), dtype=np.int32)
-    context_features = np.empty((n, max_context_len, FEATURES_SIZE), dtype=np.int32)
+    context_len = np.zeros((n,), dtype=np.int32)
+    context_features = np.zeros((n, max_context_len, FEATURES_SIZE), dtype=np.int32)
     question = np.zeros((n, max_question_len), dtype=np.int32)
-    question_len = np.empty((n,), dtype=np.int32)
-    answer_begin = np.empty((n,), dtype=np.int32)
-    answer_end = np.empty((n,), dtype=np.int32)
+    question_len = np.zeros((n,), dtype=np.int32)
+    answer_begin = np.zeros((n,), dtype=np.int32)
+    answer_end = np.zeros((n,), dtype=np.int32)
     return (
             (context, context_len, context_features),
             (question, question_len),

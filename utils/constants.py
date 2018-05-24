@@ -2,7 +2,8 @@ import os
 from os import sep as SEP
 
 # Folders
-PROJECT_PATH = os.path.normpath(os.getcwd() + os.sep + os.pardir)
+#PROJECT_PATH = os.path.normpath(os.getcwd() + os.sep + os.pardir)
+PROJECT_PATH = "/home/max/programming/squad/squad/"
 
 SCRIPTS_FOLDER = "utils"
 SCRIPTS_PATH = PROJECT_PATH + SEP + SCRIPTS_FOLDER
