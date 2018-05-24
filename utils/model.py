@@ -5,11 +5,13 @@ from tqdm import tqdm
 import numpy as np
 import tensorflow as tf
 
-BATCH_SIZE = 200
+BATCH_SIZE = 32
 EPOCHS = 10
 EMBEDDING_SIZE = 300
 RNN_HIDDEN_SIZE = 128
 SOFT = 2
+FEATURES_SIZE = 2
+PARTS_NUM = 44
 
 def rnn_cell(hidden_size, name, keep_in, keep_out, keep_state):
     return tf.nn.rnn_cell.DropoutWrapper(
@@ -130,6 +132,21 @@ class Model:
             self.__batch_size = tf.shape(self.question)[0]
             self.__question_size = tf.shape(self.question)[1]
             self.__context_size = tf.shape(self.context)[1]
+            self.__context_with_features = tf.concat(
+                    [
+                        self.context,
+                        tf.cast(
+                            self.context_features[:, :, 1],
+                            tf.float32
+                        )[:,:,tf.newaxis],
+                        tf.one_hot(
+                            self.context_features[:, :, 0],
+                            PARTS_NUM,
+                            dtype=tf.float32
+                        )
+                    ],
+                    axis=-1
+                )
             with tf.variable_scope("question"):
                 question_out = self.__setup_question()
                 question_features = self.__setup_question_features(
@@ -167,15 +184,20 @@ class Model:
             name="context",
             shape=(None, None, self.__EMBEDDING_SIZE)
         )
-        self.question = tf.placeholder(
-            tf.float32,
-            name="question",
-            shape=(None, None, self.__EMBEDDING_SIZE)
-        )
         self.context_len = tf.placeholder(
             tf.int32,
             name="context_lenght",
             shape=(None)
+        )
+        self.context_features = tf.placeholder(
+            tf.int32,
+            name="context_features",
+            shape=(None, None, FEATURES_SIZE)
+        )
+        self.question = tf.placeholder(
+            tf.float32,
+            name="question",
+            shape=(None, None, self.__EMBEDDING_SIZE)
         )
         self.question_len = tf.placeholder(
             tf.int32,
@@ -246,12 +268,14 @@ class Model:
                 dtype=tf.float32
         )
         question_attention = tf.nn.softmax(question_attention) * question_mask
+        '''
         for_divide = tf.reduce_sum(
                 question_attention,
                 axis=1
         )
-        print(for_divide)
+        #TODO
         question_attention = question_attention / for_divide[:,tf.newaxis]
+        '''
         question_features = tf.reduce_sum(
                 question_outputs * question_attention[:,:,tf.newaxis],
                 axis=1,
@@ -277,7 +301,7 @@ class Model:
                 question_state[1]
         )'''
         context_layer1 = bidirect_cell(
-                self.context,
+                self.__context_with_features,
                 self.context_len,
                 name="c_rnn1",
                 hidden_size=RNN_HIDDEN_SIZE,
@@ -498,7 +522,7 @@ class Model:
             train_summary_every=None,
             test_summary_every=None,
             keep_prob=1.0,
-            window=15,
+            window=20,
             epochs=1
     ):
         step = 0
@@ -524,6 +548,7 @@ class Model:
                             {
                                 self.context: batch[0][0],
                                 self.context_len: batch[0][1],
+                                self.context_features: batch[0][2],
                                 self.question: batch[1][0],
                                 self.question_len: batch[1][1],
                                 self.true_answer_begin: batch[2][0],
@@ -539,6 +564,7 @@ class Model:
                             {
                                 self.context: batch[0][0],
                                 self.context_len: batch[0][1],
+                                self.context_features: batch[0][2],
                                 self.question: batch[1][0],
                                 self.question_len: batch[1][1],
                                 self.true_answer_begin: batch[2][0],
@@ -567,6 +593,7 @@ class Model:
             {
                 self.context: batch[0][0],
                 self.context_len: batch[0][1],
+                self.context_features: batch[0][2],
                 self.question: batch[1][0],
                 self.question_len: batch[1][1],
                 self.true_answer_begin: batch[2][0],
