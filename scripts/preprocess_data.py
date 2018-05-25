@@ -1,3 +1,6 @@
+import sys
+sys.path.insert(0, '../utils')
+
 from constants import *
 
 import numpy as np

@@ -1,8 +1,11 @@
+import sys
+sys.path.insert(0, '../utils')
+
+from constants import *
+
 import json
 from tqdm import tqdm
 import numpy as np
-
-from constants import *
 
 def make_vocabulary(vocabulary, tokenized_data):
     for par in tqdm(tokenized_data['paragraphs']):

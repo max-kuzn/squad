@@ -7,7 +7,7 @@ import tensorflow as tf
 
 BATCH_SIZE = 32
 EMBEDDING_SIZE = 300
-RNN_HIDDEN_SIZE = 100
+RNN_HIDDEN_SIZE = 128
 FEATURES_SIZE = 2
 PARTS_NUM = 44
 
@@ -173,11 +173,21 @@ class Model:
                         points[1]
                 )
             self.__summary_all()
-
+            update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+            print("_________________")
+            print(update_ops)
+            print("_________________")
+            with tf.control_dependencies(update_ops):
+                optimizer = tf.train.RMSPropOptimizer(0.001)
+                self.train_step = optimizer.minimize(self.loss)
+            '''
             optimizer = tf.train.RMSPropOptimizer(0.001)
-            gradients, variables = zip(*optimizer.compute_gradients(self.loss))
-            # gradients, _ = tf.clip_by_global_norm(gradients, 1000)
-            self.train_step = optimizer.apply_gradients(zip(gradients, variables))
+            self.train_step = optimizer.minimize(self.loss)
+            update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+            if update_ops:
+                updates = tf.group(*update_ops)
+                total_loss = control_flow_ops.with_dependencies([updates], self.loss)
+            '''
             self.init = tf.global_variables_initializer()
             self.saver = tf.train.Saver()
     # __setup_model
@@ -243,12 +253,12 @@ class Model:
                 name="q_rnn1",
                 hidden_size=RNN_HIDDEN_SIZE,
                 keep_state=self.keep_prob,
-                keep_in=self.keep_prob
+                keep_in=1.0
             )
         output1 = group_outputs(
                 question_layer1[0],
                 mode="concat",
-                bn=True,
+                bn=False,
                 is_training=self.is_training
         )
         question_layer2 = bidirect_cell(
@@ -257,7 +267,7 @@ class Model:
                 name="q_rnn2",
                 hidden_size=RNN_HIDDEN_SIZE,
                 keep_state=self.keep_prob,
-                keep_in=self.keep_prob
+                keep_in=1.0
         )
         return question_layer2
     # __setup_question
@@ -266,7 +276,7 @@ class Model:
         question_outputs = group_outputs(
                 question_out[0],
                 mode='concat',
-                bn=True,
+                bn=False,
                 is_training=self.is_training
         )
         question_attention = tf.layers.dense(
@@ -306,20 +316,20 @@ class Model:
                 name="c_rnn1",
                 hidden_size=RNN_HIDDEN_SIZE,
                 keep_state=self.keep_prob,
-                keep_in=self.keep_prob
+                keep_in=1.0
         )
         context_layer2 = bidirect_cell(
                 group_outputs(
                     context_layer1[0],
                     mode="concat",
-                    bn=True,
+                    bn=False,
                     is_training=self.is_training
                 ),
                 self.context_len,
                 name="c_rnn2",
                 hidden_size=RNN_HIDDEN_SIZE,
                 keep_state=self.keep_prob,
-                keep_in=self.keep_prob
+                keep_in=1.0
         )
         return context_layer2
     # __setup_context()
@@ -332,7 +342,7 @@ class Model:
         context_outputs = group_outputs(
                 context_out[0],
                 mode="concat",
-                bn=True,
+                bn=False,
                 is_training=self.is_training
         )
         dense_begin = tf.layers.dense(
@@ -536,7 +546,7 @@ class Model:
                         self.__embeddings
                     )
             ):
-                if train_summary_every != None and step % train_summary_every == 0:
+                if train_summary_every != None and step % train_summary_every == 1:
                     summary, _ = session.run(
                             [
                                 self.summary,
@@ -572,7 +582,7 @@ class Model:
                                 self.is_training: True
                             }
                     )
-                if test_summary_every != None and step % test_summary_every == 0:
+                if test_summary_every != None and step % test_summary_every == 1:
                     self.evaluate(
                             session,
                             test,
