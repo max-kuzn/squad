@@ -8,8 +8,11 @@ import tensorflow as tf
 BATCH_SIZE = 32
 EMBEDDING_SIZE = 300
 RNN_HIDDEN_SIZE = 128
-FEATURES_SIZE = 2
+INT_FEATURES_SIZE = 5
+FLOAT_FEATURES_SIZE = 1
 PARTS_NUM = 44
+ENT_NUM = 19
+TAG_NUM = 50
 
 def rnn_cell(hidden_size, name, keep_in, keep_out, keep_state):
     return tf.nn.rnn_cell.DropoutWrapper(
@@ -53,6 +56,23 @@ def bidirect_cell(
         )
 # bidirect_cell
 
+'''
+def batch_norm_layer(x, train_phase):
+    bn_train = tf.batch_norm(x, decay=0.999, center=True, scale=True,
+        is_training=True,
+        reuse=None, # is this right?
+        trainable=True
+    )
+
+    bn_inference = batch_norm(x, decay=0.999, center=True, scale=True,
+            is_training=False,
+        reuse=True, # is this right?
+        trainable=True
+    )
+    return tf.cond(train_phase, lambda: bn_train, lambda: bn_inference)
+#batch_norm_layer
+'''
+
 def group_outputs(outputs, mode=None, bn=False, is_training=False):
     if mode == "concat":
         outputs = tf.concat([outputs[0], outputs[1]], axis=2)
@@ -63,11 +83,13 @@ def group_outputs(outputs, mode=None, bn=False, is_training=False):
     if bn:
         outputs = tf.layers.batch_normalization(
                 outputs,
-                training=is_training
+                training=is_training,
+                trainable=False
         )
     return outputs
 # group_outputs
 
+'''
 def group_LSTM_state(states, make=False, mode=None, bn=False, is_training=False):
     if make and (mode == "concat_all" or mode == "sum_all"):
         raise
@@ -84,14 +106,15 @@ def group_LSTM_state(states, make=False, mode=None, bn=False, is_training=False)
     else:
         raise
     if bn:
-        states = tf.layers.batch_normalization(
+        states = batch_norm_layer(
                 states,
-                training=is_training
+                is_training
         )
     if make:
         return tf.contrib.rnn.LSTMStateTuple(states[0], states[1])
     return states
 # make_LSTM_state
+'''
 
 class Model:
     def __init__(
@@ -139,13 +162,19 @@ class Model:
                             self.context,
                             self.keep_prob
                         ),
+                        self.context_float_features,
                         tf.cast(
-                            self.context_features[:, :, 1],
+                            self.context_int_features[:, :, 0:3],
                             tf.float32
-                        )[:,:,tf.newaxis],
+                        ),
                         tf.one_hot(
-                            self.context_features[:, :, 0],
-                            PARTS_NUM,
+                            self.context_int_features[:, :, 3],
+                            TAG_NUM,
+                            dtype=tf.float32
+                        ),
+                        tf.one_hot(
+                            self.context_int_features[:, :, 4],
+                            ENT_NUM,
                             dtype=tf.float32
                         )
                     ],
@@ -173,13 +202,8 @@ class Model:
                         points[1]
                 )
             self.__summary_all()
-            update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-            print("_________________")
-            print(update_ops)
-            print("_________________")
-            with tf.control_dependencies(update_ops):
-                optimizer = tf.train.RMSPropOptimizer(0.001)
-                self.train_step = optimizer.minimize(self.loss)
+            optimizer = tf.train.RMSPropOptimizer(0.001)
+            self.train_step = optimizer.minimize(self.loss)
             '''
             optimizer = tf.train.RMSPropOptimizer(0.001)
             self.train_step = optimizer.minimize(self.loss)
@@ -203,10 +227,15 @@ class Model:
             name="context_lenght",
             shape=(None)
         )
-        self.context_features = tf.placeholder(
+        self.context_int_features = tf.placeholder(
             tf.int32,
-            name="context_features",
-            shape=(None, None, FEATURES_SIZE)
+            name="context_int_features",
+            shape=(None, None, INT_FEATURES_SIZE)
+        )
+        self.context_float_features = tf.placeholder(
+            tf.float32,
+            name="context_float_features",
+            shape=(None, None, FLOAT_FEATURES_SIZE)
         )
         self.question = tf.placeholder(
             tf.float32,
@@ -504,11 +533,11 @@ class Model:
         )
         self.summary = tf.summary.merge_all()
         self.train_writer = tf.summary.FileWriter(
-                LOGS_PATH + SEP + "train",
+                LOGS_PATH + SEP + "curr/train",
                 graph=self.graph
         )
         self.test_writer = tf.summary.FileWriter(
-                LOGS_PATH + SEP + "test",
+                LOGS_PATH + SEP + "curr/test",
                 graph=self.graph
         )
     # __summary_all
@@ -533,6 +562,9 @@ class Model:
             window=20,
             epochs=1
     ):
+        print("_______________")
+        print(train[0][2].shape)
+        print("_______________")
         step = 0
         mask = get_answer_mask(
                 train[0][0].shape[1],
@@ -555,7 +587,8 @@ class Model:
                             {
                                 self.context: batch[0][0],
                                 self.context_len: batch[0][1],
-                                self.context_features: batch[0][2],
+                                self.context_int_features: batch[0][2],
+                                self.context_float_features: batch[0][3],
                                 self.question: batch[1][0],
                                 self.question_len: batch[1][1],
                                 self.true_answer_begin: batch[2][0],
@@ -572,7 +605,8 @@ class Model:
                             {
                                 self.context: batch[0][0],
                                 self.context_len: batch[0][1],
-                                self.context_features: batch[0][2],
+                                self.context_int_features: batch[0][2],
+                                self.context_float_features: batch[0][3],
                                 self.question: batch[1][0],
                                 self.question_len: batch[1][1],
                                 self.true_answer_begin: batch[2][0],

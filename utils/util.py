@@ -4,6 +4,7 @@ import json
 import numpy as np
 import subprocess
 import fastText
+import msgpack
 
 def tokenize(string):
     tokenizer = subprocess.Popen(
@@ -46,7 +47,12 @@ class Embedding:
             path_to_emb=KNOWN_EMBEDDING_PATH,
             path_to_i2w=INDEX2WORD_PATH
     ):
-        self.__train_embeddings = np.load(path_to_emb)
+        #self.__train_embeddings = np.load(path_to_emb)
+        with open(F_EMBEDDING_PATH, 'rb') as f:
+            self.__train_embeddings = np.array(
+                    msgpack.load(f, encoding='utf8')['embedding'],
+                    dtype=np.float32
+            )
         i2w = np.load(path_to_i2w)
         w2i = dict()
         for i in range(i2w.shape[0]):
@@ -62,6 +68,7 @@ class Embedding:
     def get_known(self, key):
         if self.__mode == "test":
             raise
+        return self.__train_embeddings[key]
         if np.issubdtype(type(key), np.integer):
             return self.__train_embeddings[key]
         elif isinstance(key, list):
@@ -87,16 +94,19 @@ class Embedding:
 # context_data  = (context,      context_len)
 # question_data = (quiestion,    quiestion_len)
 # answer        = (answer_begin, answer_end)
-def load_train(path=COMFORT_TRAIN_PATH):
+def load_train(path=F_COMFORT_TRAIN_PATH):
     data = np.load(path)
+    print("____________")
+    print(data['context_int_features'].shape)
+    print("____________")
     return (
-            (data['context'], data['context_len'], data['context_features']),
+            (data['context'], data['context_len'], data['context_int_features'], data['context_float_features']),
             (data['question'], data['question_len']),
             (data['answer_begin'], data['answer_end'])
            )
 # load_train
 
-def load_test(path=COMFORT_TEST_PATH):
+def load_test(path=F_COMFORT_TEST_PATH):
     data = np.load(path)
     return (
             (data['context'], data['context_len'], data['context_features']),
@@ -110,13 +120,14 @@ def get_random_batch(data, batch_size, embedding):
     indexes = np.random.choice(n, batch_size, replace=False)
     context = embedding.get_known(data[0][0][indexes])
     context_len = data[0][1][indexes]
-    context_features = data[0][2][indexes]
+    context_int_features = data[0][2][indexes]
+    context_float_features = data[0][3][indexes]
     question = embedding.get_known(data[1][0][indexes])
     question_len = data[1][1][indexes]
     answer_begin = data[2][0][indexes]
     answer_end = data[2][1][indexes]
     return (
-            (context, context_len, context_features),
+            (context, context_len, context_int_features, context_float_features),
             (question, question_len),
             (answer_begin, answer_end)
         )
@@ -125,13 +136,14 @@ def get_random_batch(data, batch_size, embedding):
 def get_batch(data, l, r, embedding):
     context = embedding.get_known(data[0][0][l:r])
     context_len = data[0][1][l:r]
-    context_features = data[0][2][l:r]
+    context_int_features = data[0][2][l:r]
+    context_float_features = data[0][3][l:r]
     question = embedding.get_known(data[1][0][l:r])
     question_len = data[1][1][l:r]
     answer_begin = data[2][0][l:r]
     answer_end = data[2][1][l:r]
     return (
-            (context, context_len, context_features),
+            (context, context_len, context_int_features, context_float_features),
             (question, question_len),
             (answer_begin, answer_end)
         )
@@ -141,13 +153,14 @@ def shuffle(data):
     shuffle = np.random.permutation(data[0][0].shape[0])
     context = data[0][0][shuffle]
     context_len = data[0][1][shuffle]
-    context_features = data[0][2][shuffle]
+    context_int_features = data[0][2][shuffle]
+    context_float_features = data[0][3][shuffle]
     question = data[1][0][shuffle]
     question_len = data[1][1][shuffle]
     answer_begin = data[2][0][shuffle]
     answer_end = data[2][1][shuffle]
     return (
-            (context, context_len, context_features),
+            (context, context_len, context_int_features, context_float_features),
             (question, question_len),
             (answer_begin, answer_end)
            )
