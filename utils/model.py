@@ -83,7 +83,7 @@ def group_outputs(outputs, mode=None, bn=False, is_training=False):
     if bn:
         outputs = tf.layers.batch_normalization(
                 outputs,
-                training=is_training,
+                training=True,
                 trainable=False
         )
     return outputs
@@ -202,16 +202,14 @@ class Model:
                         points[1]
                 )
             self.__summary_all()
-            optimizer = tf.train.RMSPropOptimizer(0.001)
-            self.train_step = optimizer.minimize(self.loss)
             '''
             optimizer = tf.train.RMSPropOptimizer(0.001)
             self.train_step = optimizer.minimize(self.loss)
+            '''
             update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-            if update_ops:
-                updates = tf.group(*update_ops)
-                total_loss = control_flow_ops.with_dependencies([updates], self.loss)
-            '''
+            with tf.control_dependencies(update_ops):
+                optimizer = tf.train.RMSPropOptimizer(0.001)
+                self.train_step = optimizer.minimize(self.loss)
             self.init = tf.global_variables_initializer()
             self.saver = tf.train.Saver()
     # __setup_model
@@ -298,6 +296,22 @@ class Model:
                 keep_state=self.keep_prob,
                 keep_in=1.0
         )
+        output2 = group_outputs(
+                question_layer2[0],
+                mode="concat",
+                bn=False,
+                is_training=self.is_training
+        )
+        '''
+        question_layer3 = bidirect_cell(
+                output2,
+                self.question_len,
+                name="q_rnn3",
+                hidden_size=RNN_HIDDEN_SIZE,
+                keep_state=self.keep_prob,
+                keep_in=1.0
+        )
+        '''
         return question_layer2
     # __setup_question
 
@@ -360,6 +374,21 @@ class Model:
                 keep_state=self.keep_prob,
                 keep_in=1.0
         )
+        '''
+        context_layer3 = bidirect_cell(
+                group_outputs(
+                    context_layer2[0],
+                    mode="concat",
+                    bn=False,
+                    is_training=self.is_training
+                ),
+                self.context_len,
+                name="c_rnn3",
+                hidden_size=RNN_HIDDEN_SIZE,
+                keep_state=self.keep_prob,
+                keep_in=1.0
+        )
+        '''
         return context_layer2
     # __setup_context()
 
@@ -441,7 +470,9 @@ class Model:
                 name='context_mask',
                 dtype=tf.float32
         )
+        self.softmax_begin = tf.nn.softmax(points_begin) * context_mask
         softmax_begin = tf.nn.softmax(points_begin) * context_mask
+        self.softmax_end = tf.nn.softmax(points_end) * context_mask
         softmax_end = tf.nn.softmax(points_end) * context_mask
         matrix_answers = tf.matmul(
                 tf.reshape(
@@ -526,9 +557,10 @@ class Model:
             ),
             name='FPN'
         )
+        self.F1_score = 2 * TP / (2 * TP + FPN)
         tf.summary.scalar('F1 score',
             tf.reduce_mean(
-                2 * TP / (2 * TP + FPN)
+                self.F1_score
             )
         )
         self.summary = tf.summary.merge_all()
@@ -560,11 +592,10 @@ class Model:
             test_summary_every=None,
             keep_prob=1.0,
             window=20,
-            epochs=1
+            epochs=1,
+            steps=None
     ):
-        print("_______________")
-        print(train[0][2].shape)
-        print("_______________")
+        out = False
         step = 0
         mask = get_answer_mask(
                 train[0][0].shape[1],
@@ -578,7 +609,7 @@ class Model:
                         self.__embeddings
                     )
             ):
-                if train_summary_every != None and step % train_summary_every == 1:
+                if train_summary_every != None and step % train_summary_every == 0:
                     summary, _ = session.run(
                             [
                                 self.summary,
@@ -587,12 +618,12 @@ class Model:
                             {
                                 self.context: batch[0][0],
                                 self.context_len: batch[0][1],
-                                self.context_int_features: batch[0][2],
-                                self.context_float_features: batch[0][3],
-                                self.question: batch[1][0],
-                                self.question_len: batch[1][1],
-                                self.true_answer_begin: batch[2][0],
-                                self.true_answer_end: batch[2][1],
+                                self.context_int_features: batch[1][0],
+                                self.context_float_features: batch[1][1],
+                                self.question: batch[2][0],
+                                self.question_len: batch[2][1],
+                                self.true_answer_begin: batch[3][0],
+                                self.true_answer_end: batch[3][1],
                                 self.answer_mask: mask,
                                 self.keep_prob: keep_prob,
                                 self.is_training: True
@@ -605,18 +636,18 @@ class Model:
                             {
                                 self.context: batch[0][0],
                                 self.context_len: batch[0][1],
-                                self.context_int_features: batch[0][2],
-                                self.context_float_features: batch[0][3],
-                                self.question: batch[1][0],
-                                self.question_len: batch[1][1],
-                                self.true_answer_begin: batch[2][0],
-                                self.true_answer_end: batch[2][1],
+                                self.context_int_features: batch[1][0],
+                                self.context_float_features: batch[1][1],
+                                self.question: batch[2][0],
+                                self.question_len: batch[2][1],
+                                self.true_answer_begin: batch[3][0],
+                                self.true_answer_end: batch[3][1],
                                 self.answer_mask: mask,
                                 self.keep_prob: keep_prob,
                                 self.is_training: True
                             }
                     )
-                if test_summary_every != None and step % test_summary_every == 1:
+                if test_summary_every != None and step % test_summary_every == 0:
                     self.evaluate(
                             session,
                             test,
@@ -626,31 +657,109 @@ class Model:
                             batch_size=BATCH_SIZE
                     )
                 step += 1
+                if steps != None and step == steps:
+                    out = True
+                    break
+            self.save_model(session, add='/' + str(e))
+            if out:
+                break
     # train_model
 
-    def evaluate(self, session, test, window, x, keep_prob=1.0, batch_size=BATCH_SIZE):
-        batch = get_random_batch(test, batch_size, self.__embeddings)
+    def evaluate(self,
+            session,
+            test,
+            window,
+            x=None,
+            keep_prob=1.0,
+            batch_size=BATCH_SIZE,
+            tensorboard=True
+    ):
         mask = get_answer_mask(test[0][0].shape[1], window)
-        summary = session.run(
-            self.summary,
-            {
-                self.context: batch[0][0],
-                self.context_len: batch[0][1],
-                self.context_features: batch[0][2],
-                self.question: batch[1][0],
-                self.question_len: batch[1][1],
-                self.true_answer_begin: batch[2][0],
-                self.true_answer_end: batch[2][1],
-                self.answer_mask: mask,
-                self.keep_prob: keep_prob,
-                self.is_training: False
-            }
-        )
-        self.test_writer.add_summary(summary, x)
+        if tensorboard:
+            batch = get_random_batch(test, batch_size, self.__embeddings)
+            summary = session.run(
+                self.summary,
+                {
+                    self.context: batch[0][0],
+                    self.context_len: batch[0][1],
+                    self.context_int_features: batch[1][0],
+                    self.context_float_features: batch[1][1],
+                    self.question: batch[2][0],
+                    self.question_len: batch[2][1],
+                    self.true_answer_begin: batch[3][0],
+                    self.true_answer_end: batch[3][1],
+                    self.answer_mask: mask,
+                    self.keep_prob: keep_prob,
+                    self.is_training: False
+                }
+            )
+            self.test_writer.add_summary(summary, x)
+        else:
+            N = 0
+            f1_sum = 0
+            for batch in tqdm(next_batch(
+                    test,
+                    batch_size,
+                    self.__embeddings
+                )
+            ):
+                F1_score = session.run(
+                    [
+                        self.F1_score
+                    ],
+                    {
+                        self.context: batch[0][0],
+                        self.context_len: batch[0][1],
+                        self.context_int_features: batch[1][0],
+                        self.context_float_features: batch[1][1],
+                        self.question: batch[2][0],
+                        self.question_len: batch[2][1],
+                        self.true_answer_begin: batch[3][0],
+                        self.true_answer_end: batch[3][1],
+                        self.answer_mask: mask,
+                        self.keep_prob: keep_prob,
+                        self.is_training: False
+                    }
+                )
+                '''
+                answer_begin, answer_end = find_answer(prob_begin, prob_end, window)
+                f1_sum += f1_score(answer_begin, answer_end, 
+                        batch[3][0], batch[3][1], mode='sum'
+                    )
+                '''
+                f1_sum += F1_score[0].sum()
+                N += batch[0][0].shape[0]
+            print("F1 score for all test =", f1_sum / test[0][0].shape[0])
+
     # evaluate
 
-    def save_model(self, session, path=MODEL_PATH):
-        self.saver.save(session, path)
+    def get_answer(self, session, data, window=15, keep_prob=1.0):
+        mask = get_answer_mask(data[0][0].shape[1], window)
+        batch = get_random_batch(data, 1, self.__embeddings)
+        answer_begin, answer_end = session.run(
+                    [
+                        self.answer_begin,
+                        self.answer_end
+                    ],
+                    {
+                        self.context: batch[0][0],
+                        self.context_len: batch[0][1],
+                        self.context_int_features: batch[1][0],
+                        self.context_float_features: batch[1][1],
+                        self.question: batch[2][0],
+                        self.question_len: batch[2][1],
+                        self.true_answer_begin: batch[3][0],
+                        self.true_answer_end: batch[3][1],
+                        self.answer_mask: mask,
+                        self.keep_prob: keep_prob,
+                        self.is_training: False
+                    }
+                )
+        return answer_begin, answer_end
+    # get_answer
+
+    def save_model(self, session, path=MODEL_PATH, add=''):
+        self.saver.save(session, path + add)
     # save_movel
 
     def load_model(self, session, path=MODEL_PATH):

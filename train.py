@@ -10,8 +10,7 @@ import tensorflow as tf
 def main():
     print("Loading data...")
     train = load_train()
-    #test = load_test()
-    test = None
+    test = load_test()
     print("Done.\n")
     m = Model()
     sess = tf.Session(graph=m.graph)
@@ -24,11 +23,21 @@ def main():
             sess,
             train,
             test,
-            epochs=30,
+            epochs=1,
+            steps=None,
             batch_size=32,
-            keep_prob=0.8,
+            keep_prob=0.7,
+            window=15,
             train_summary_every=50,
-            test_summary_every=None
+            test_summary_every=200
+    )
+    print("Start testing...")
+    m.evaluate(sess,
+            test,
+            window=15,
+            keep_prob=1.0,
+            batch_size=32,
+            tensorboard=False
     )
     m.save_model(sess)
 # main

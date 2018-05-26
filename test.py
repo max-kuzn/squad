@@ -17,7 +17,13 @@ def main():
     print("Loadding model.")
     print("Start testing")
     m.load_model(sess)
-    m.validate(sess, test)
+    m.evaluate(sess,
+            test,
+            window=15,
+            keep_prob=1.0,
+            batch_size=32,
+            tensorboard=False
+    )
 
 # main
 
