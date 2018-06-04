@@ -133,6 +133,7 @@ def main():
     os.system("wget https://www.dropbox.com/s/83txkgiqmdlv1m3/meta.msgpack?dl=1")
     os.system("mv 'meta.msgpack?dl=1' data/meta.msgpack")
     os.system("mv 'data.msgpack?dl=1' data/data.msgpack")
+    os.system("python3 -m spacy download en_core_web_sm")
     print("Done.")
     print("Loading data...")
     with open(F_DATA_PATH, 'rb') as f:
