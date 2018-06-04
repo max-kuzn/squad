@@ -23,47 +23,27 @@ class Embedding:
     def __init__(
             self,
             mode="train", # Can be "train", "test", "both"
-            path_to_train=KNOWN_EMBEDDING_PATH,
-            path_to_train_index2word=INDEX2WORD_PATH,
-            path_to_bin=ALL_EMBEDDING_PATH
+            path_to_train=F_EMBEDDING_PATH
     ):
         self.__emb_size = 300
         self.__mode = mode
         self.__train_embeddings = None # numpy array
-        self.__train_index2word = None
-        self.__train_word2index = None
-        self.__all_embeddings = None   # fastText model
         if mode == "train" or mode == "both":
             self.__load_train_embeddings(
-                    path_to_emb=path_to_train,
-                    path_to_i2w=path_to_train_index2word
+                    path_to_emb=path_to_train
             )
-        if mode == "test" or mode == "both":
-            self.__load_all_embeddings(path=path_to_bin)
     # __init__
 
     def __load_train_embeddings(
             self,
-            path_to_emb=KNOWN_EMBEDDING_PATH,
-            path_to_i2w=INDEX2WORD_PATH
+            path_to_emb
     ):
-        #self.__train_embeddings = np.load(path_to_emb)
-        with open(F_EMBEDDING_PATH, 'rb') as f:
+        with open(path_to_emb, 'rb') as f:
             self.__train_embeddings = np.array(
                     msgpack.load(f, encoding='utf8')['embedding'],
                     dtype=np.float32
             )
-        i2w = np.load(path_to_i2w)
-        w2i = dict()
-        for i in range(i2w.shape[0]):
-            w2i[i2w[i]] = i
-        self.__train_index2word = i2w
-        self.__train_word2index = w2i
     # __load_train_embeddings
-
-    def __load_all_embeddings(self, path=ALL_EMBEDDING_PATH):
-        self.__all_embeddings = fastText.load_model(path)
-    # __load_all_embeddings
 
     def get_known(self, key):
         if self.__mode == "test":

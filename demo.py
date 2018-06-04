@@ -89,7 +89,7 @@ def main():
     m = Model()
     print("Done.")
     sess = tf.Session(graph=m.graph)
-    m.load_model(sess, '/home/max/programming/squad/squad/data/model/6/model')
+    m.load_model(sess)
     try:
         while(1):
             print("\n____________________________________________\n")
