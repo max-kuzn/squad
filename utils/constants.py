@@ -2,7 +2,7 @@ import os
 from os import sep as SEP
 
 # Folders
-PROJECT_PATH = os.path.normalize(os.path.dirname(os.path.abspath(__file__)) + "/../")
+PROJECT_PATH = os.path.normpath(os.path.dirname(os.path.abspath(__file__)) + "/../")
 
 SCRIPTS_FOLDER = "utils"
 SCRIPTS_PATH = PROJECT_PATH + SEP + SCRIPTS_FOLDER
