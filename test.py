@@ -9,22 +9,23 @@ import tensorflow as tf
 
 def main():
     print("Loading test data...")
-    test = load_test()
+    test = load_train()
     print("Done.\n")
     m = Model()
-    sess = tf.Session(graph=m.graph)
     print("\n\n")
     print("Loadding model.")
-    print("Start testing")
-    m.load_model(sess)
-    m.evaluate(sess,
+    sess = tf.Session(graph=m.graph)
+    m.load_model(sess, '/home/max/programming/squad/squad/data/model/6/model')
+    print("Start testing", test[0][0].shape[0] // 32 + int(test[0][0].shape[0] != 32), "batches")
+
+    f1 = m.evaluate(sess,
             test,
             window=15,
-            keep_prob=1.0,
+            keep_prob=0.9,
             batch_size=32,
             tensorboard=False
     )
-
+    print(f1)
 # main
 
 if __name__ == "__main__":
