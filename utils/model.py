@@ -302,16 +302,6 @@ class Model:
                 bn=False,
                 is_training=self.is_training
         )
-        '''
-        question_layer3 = bidirect_cell(
-                output2,
-                self.question_len,
-                name="q_rnn3",
-                hidden_size=RNN_HIDDEN_SIZE,
-                keep_state=self.keep_prob,
-                keep_in=1.0
-        )
-        '''
         return question_layer2
     # __setup_question
 
@@ -374,21 +364,6 @@ class Model:
                 keep_state=self.keep_prob,
                 keep_in=1.0
         )
-        '''
-        context_layer3 = bidirect_cell(
-                group_outputs(
-                    context_layer2[0],
-                    mode="concat",
-                    bn=False,
-                    is_training=self.is_training
-                ),
-                self.context_len,
-                name="c_rnn3",
-                hidden_size=RNN_HIDDEN_SIZE,
-                keep_state=self.keep_prob,
-                keep_in=1.0
-        )
-        '''
         return context_layer2
     # __setup_context()
 
@@ -470,9 +445,7 @@ class Model:
                 name='context_mask',
                 dtype=tf.float32
         )
-        self.softmax_begin = tf.nn.softmax(points_begin) * context_mask
         softmax_begin = tf.nn.softmax(points_begin) * context_mask
-        self.softmax_end = tf.nn.softmax(points_end) * context_mask
         softmax_end = tf.nn.softmax(points_end) * context_mask
         matrix_answers = tf.matmul(
                 tf.reshape(
@@ -519,20 +492,6 @@ class Model:
                 dtype=tf.float32
             ) / tf.cast(tf.size(good_begin), tf.float32)
         )
-        '''
-        tf.summary.scalar('Answer end accuracy',
-            tf.count_nonzero(
-                good_end,
-                dtype=tf.float32
-            ) * 100 / tf.cast(tf.size(good_end), dtype=tf.float32)
-        )
-        tf.summary.scalar('Answer begin or end accuracy',
-            tf.count_nonzero(
-                tf.logical_or(good_begin, good_end),
-                dtype=tf.float32
-            ) * 100 / tf.cast(tf.size(good_end), dtype=tf.float32)
-        )
-        '''
         tf.summary.scalar('Answer begin and end accuracy',
                 tf.count_nonzero(
                     tf.logical_and(good_begin, good_end),
@@ -660,7 +619,7 @@ class Model:
                 if steps != None and step == steps:
                     out = True
                     break
-            self.save_model(session, add='/' + str(e))
+            #self.save_model(session, path=DATA_PATH + '/model/' + str(e) + '/model')
             if out:
                 break
     # train_model
@@ -729,7 +688,8 @@ class Model:
                 '''
                 f1_sum += F1_score[0].sum()
                 N += batch[0][0].shape[0]
-            print("F1 score for all test =", f1_sum / test[0][0].shape[0])
+            print("F1 score for all test =", f1_sum / N)
+            return f1_sum / N
 
     # evaluate
 

@@ -23,9 +23,9 @@ def main():
             sess,
             train,
             test,
-            epochs=1,
+            epochs=7,
             steps=None,
-            batch_size=32,
+            batch_size=128,
             keep_prob=0.7,
             window=15,
             train_summary_every=50,
@@ -39,7 +39,7 @@ def main():
             batch_size=32,
             tensorboard=False
     )
-    m.save_model(sess)
+    #m.save_model(sess)
 # main
 
 if __name__ == "__main__":

@@ -30,7 +30,6 @@ def get_tokens(text):
     global tokenize
     tokens = tokenize(text)
     tokens = [unicodedata.normalize('NFD', str(w)) for w in tokens]
-    print(tokens)
     return tokens
 # get_tokens
 
@@ -90,15 +89,17 @@ def main():
     m = Model()
     print("Done.")
     sess = tf.Session(graph=m.graph)
-    m.load_model(sess)
+    m.load_model(sess, '/home/max/programming/squad/squad/data/model/6/model')
     try:
         while(1):
+            print("\n____________________________________________\n")
             context = input("Conetxt:\n")
+            print("\n____________________________________________\n")
             question = input("Question:\n")
-            print("Context:", context)
-            print("Question:", question)
+            print("\n____________________________________________\n")
             answer = find_answer(sess, m, context, question)
             print("Answer:", answer)
+            print("\n____________________________________________\n")
     except EOFError:
         pass
 # main
