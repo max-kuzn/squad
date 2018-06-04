@@ -3,9 +3,9 @@
 По входным контексту и вопросу необходимо найти ответ на данный вопрос в данном контексте.
 
 ### Ссылки:
-[Сайт соревнования](https://rajpurkar.github.io/SQuAD-explorer/)
-[Статья](https://arxiv.org/pdf/1704.00051.pdf), на основе которой была написана модель
-Обработанные данные взяты [отсюда](https://github.com/facebookresearch/DrQA)
+[Сайт соревнования](https://rajpurkar.github.io/SQuAD-explorer/).
+[Статья](https://arxiv.org/pdf/1704.00051.pdf), на основе которой была написана модель.
+Обработанные данные взяты [отсюда](https://github.com/facebookresearch/DrQA).
 
 ### Установка
 <pre>git clone https://github.com/facebookresearch/DrQA.git
@@ -20,5 +20,5 @@ python3 prepare.py</pre>
   3. demo.py - выдает ответ по введенным данным
 
 ### Результат
-Модель обучалась на 7 эпохах
-F1-score на тестовом датасете равен 0.43
+Модель обучалась на 7 эпохах.
+F1-score на тестовом датасете равен 0.43.
