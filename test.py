@@ -15,7 +15,7 @@ def main():
     print("\n\n")
     print("Loadding model.")
     sess = tf.Session(graph=m.graph)
-    m.load_model(sess, MODEL_PATH)
+    m.load_model(sess)
     print("Start testing", test[0][0].shape[0] // 32 + int(test[0][0].shape[0] != 32), "batches")
 
     f1 = m.evaluate(sess,
