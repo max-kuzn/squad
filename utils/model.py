@@ -619,7 +619,6 @@ class Model:
                 if steps != None and step == steps:
                     out = True
                     break
-            #self.save_model(session, path=DATA_PATH + '/model/' + str(e) + '/model')
             if out:
                 break
     # train_model
@@ -680,12 +679,6 @@ class Model:
                         self.is_training: False
                     }
                 )
-                '''
-                answer_begin, answer_end = find_answer(prob_begin, prob_end, window)
-                f1_sum += f1_score(answer_begin, answer_end, 
-                        batch[3][0], batch[3][1], mode='sum'
-                    )
-                '''
                 f1_sum += F1_score[0].sum()
                 N += batch[0][0].shape[0]
             print("F1 score for all test =", f1_sum / N)

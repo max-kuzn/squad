@@ -19,7 +19,7 @@ TOKENIZER = "tokenizer.perl"
 TOKENIZER_PATH = SCRIPTS_PATH + SEP + "tools" + SEP + TOKENIZER
 
 # Train-test files
-F_DATA = "f" + SEP + "data.msgpack"
+F_DATA = "data.msgpack"
 F_DATA_PATH = DATA_PATH + SEP + F_DATA
 
 RAW_TRAIN = "raw_train.json"
@@ -56,7 +56,7 @@ ALL_EMBEDDING_PATH = DATA_PATH + SEP + ALL_EMBEDDING
 KNOWN_EMBEDDING = "known_embedding.npy"
 KNOWN_EMBEDDING_PATH = DATA_PATH + SEP + KNOWN_EMBEDDING
 
-F_EMBEDDING = "f" + SEP + "meta.msgpack"
+F_EMBEDDING = "meta.msgpack"
 F_EMBEDDING_PATH = DATA_PATH + SEP + F_EMBEDDING
 
 # Model
