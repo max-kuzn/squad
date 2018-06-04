@@ -60,5 +60,6 @@ F_EMBEDDING_PATH = DATA_PATH + SEP + F_EMBEDDING
 
 # Model
 MODEL = "model"
-MODEL_PATH = DATA_PATH + SEP + "model" + SEP + MODEL
+#MODEL_PATH = DATA_PATH + SEP + "model" + SEP + MODEL
+MODEL_PATH = DATA_PATH + SEP + "model"
 

@@ -711,12 +711,12 @@ class Model:
         return answer_begin, answer_end
     # get_answer
 
-    def save_model(self, session, path=MODEL_PATH, add=''):
-        self.saver.save(session, path + os.sep + add)
+    def save_model(self, session, path=MODEL_PATH + os.sep + 'model'):
+        self.saver.save(session, path)
     # save_movel
 
-    def load_model(self, session, path=MODEL_PATH, add='saved'):
-        self.saver.restore(session, path + os.sep + add)
+    def load_model(self, session, path=MODEL_PATH + os.sep + 'saved' + os.sep + 'model'):
+        self.saver.restore(session, path)
     # load_model
 
 # Model
