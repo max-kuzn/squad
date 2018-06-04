@@ -2,5 +2,4 @@ tqdm
 msgpack
 spacy
 numpy
-tensorflow
 
