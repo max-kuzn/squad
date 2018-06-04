@@ -90,10 +90,6 @@ def find_dev_answer(par, answer, tokens):
             find_e = True
             end = i
             break
-    if not find_b:
-        print("Didn't find begin")
-    if not find_e:
-        print("Didn't find end")
     return begin, end, find_b and find_e
 # find_dev_answer
 
@@ -132,12 +128,6 @@ def make_comfort_data(data, is_dev=False):
 # make_comfort_data
 
 def main():
-    print("Downloading data...")
-    os.system("wget https://www.dropbox.com/s/83txkgiqmdlv1m3/meta.msgpack?dl=1")
-    os.system("mv 'meta.msgpack?dl=1' data/meta.msgpack")
-    os.system("wget https://www.dropbox.com/s/r33ljlagys0wscb/data.msgpack?dl=1")
-    os.system("mv 'data.msgpack?dl=1' data/data.msgpack")
-    print("Done.")
     print("Loading data...")
     with open(F_DATA_PATH, 'rb') as f:
         data = msgpack.load(f, encoding='utf8')
